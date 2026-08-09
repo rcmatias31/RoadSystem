@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "877390819131",
+    "project_id": "roadsystem-60da6",
+    "storage_bucket": "roadsystem-60da6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:877390819131:android:73c4eb30170f7f483d911e",
+        "android_client_info": {
+          "package_name": "com.raphael.roadsystem"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "877390819131-h2vlkqrphbcbs716junpm2itaoiq0r0g.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.raphael.roadsystem",
+            "certificate_hash": "c5a290b5edfce03ff32de0e7fad8014b8d68349c"
+          }
+        },
+        {
+          "client_id": "877390819131-5gjgt0s2klfdp1f8th5gpn2t5gco4ops.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD5450bYYQQlpNZN8GN6DySWAM3OqL3dzI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "877390819131-5gjgt0s2klfdp1f8th5gpn2t5gco4ops.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
