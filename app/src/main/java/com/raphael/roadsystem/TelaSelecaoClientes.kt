@@ -45,9 +45,28 @@ fun TelaSelecaoClientes(
     var showCreateFilterDialog by remember { mutableStateOf(false) }
     var newFilterName by remember { mutableStateOf("") }
     var selectedColorHex by remember { mutableStateOf("#2196F3") }
+    
+    var filterToDelete by remember { mutableStateOf<String?>(null) }
 
     val selecionadosCount = selecionados.size
     val isAllFilteredSelected = clientesFiltrados.isNotEmpty() && clientesFiltrados.all { selecionados.contains(it.id) }
+
+    if (filterToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { filterToDelete = null },
+            title = { Text("Excluir Filtro") },
+            text = { Text("Deseja realmente excluir o filtro \"$filterToDelete\"?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deletarFiltro(filterToDelete!!)
+                    filterToDelete = null
+                }) { Text("Excluir", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { filterToDelete = null }) { Text("Cancelar") }
+            }
+        )
+    }
 
     if (showCreateFilterDialog) {
         AlertDialog(
@@ -73,12 +92,12 @@ fun TelaSelecaoClientes(
                             Box(
                                 modifier = Modifier
                                     .size(32.dp)
-                                    .background(Color(android.graphics.Color.parseColor(color)), CircleShape)
+                                    .background(Color(color.toColorInt()), CircleShape)
                                     .padding(4.dp)
                                     .clickable { selectedColorHex = color }
                             ) {
                                 if (selectedColorHex == color) {
-                                    Icon(Icons.Default.Check, null, tint = Color.White)
+                                    Icon(Icons.Default.Check, null, tint = if (color == "#FFEB3B") Color.Black else Color.White)
                                 }
                             }
                         }
@@ -88,9 +107,15 @@ fun TelaSelecaoClientes(
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.criarFiltroPersonalizado(newFilterName, selectedColorHex)
-                        showCreateFilterDialog = false
-                        newFilterName = ""
+                        viewModel.criarFiltroPersonalizado(newFilterName, selectedColorHex) { error ->
+                            if (error != null) {
+                                Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+                            } else {
+                                showCreateFilterDialog = false
+                                newFilterName = ""
+                                selectedColorHex = "#2196F3"
+                            }
+                        }
                     },
                     enabled = newFilterName.isNotBlank()
                 ) { Text("Criar") }
@@ -118,7 +143,11 @@ fun TelaSelecaoClientes(
                         },
                         actions = {
                             if (selecionadosCount > 0) {
-                                IconButton(onClick = { showCreateFilterDialog = true }) {
+                                IconButton(onClick = { 
+                                    newFilterName = ""
+                                    selectedColorHex = "#2196F3"
+                                    showCreateFilterDialog = true 
+                                }) {
                                     Icon(Icons.Default.LibraryAdd, contentDescription = "Criar Filtro")
                                 }
                             }
@@ -170,13 +199,28 @@ fun TelaSelecaoClientes(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(gruposDisponiveis) { grupo ->
+                            val isCustom = viewModel.filtrosCustom.collectAsState().value.any { it.nome == grupo }
+                            
                             FilterChip(
                                 selected = filtroGrupo == grupo,
-                                onClick = { viewModel.selecionarGrupo(grupo) },
+                                onClick = { 
+                                    if (filtroGrupo == grupo && isCustom) {
+                                        filterToDelete = grupo
+                                    } else {
+                                        viewModel.selecionarGrupo(grupo)
+                                    }
+                                },
                                 label = { Text(grupo, style = MaterialTheme.typography.labelMedium) },
                                 leadingIcon = if (filtroGrupo == grupo) {
                                     { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
-                                } else null
+                                } else null,
+                                colors = if (isCustom) {
+                                    val colorStr = viewModel.getCorDoFiltro(grupo)
+                                    FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = Color(colorStr.toColorInt()).copy(alpha = 0.2f),
+                                        selectedLabelColor = Color(colorStr.toColorInt())
+                                    )
+                                } else FilterChipDefaults.filterChipColors()
                             )
                         }
                     }

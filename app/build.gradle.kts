@@ -115,6 +115,7 @@ dependencies {
 
     // 5. Google Maps SDK (Via Compose)
     implementation(libs.maps.compose)
+    implementation("com.google.maps.android:maps-compose-utils:8.4.0")
     implementation(libs.play.services.location)
 
     // 6. Network & UI Utilities

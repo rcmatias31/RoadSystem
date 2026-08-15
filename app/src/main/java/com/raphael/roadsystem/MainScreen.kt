@@ -8,15 +8,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,7 +43,6 @@ import com.raphael.roadsystem.utils.LocationUtils
 import com.raphael.roadsystem.viewmodel.MapaViewModel
 import com.raphael.roadsystem.viewmodel.flows.MainViewModel
 import kotlinx.coroutines.launch
-import androidx.compose.material.icons.filled.PersonAdd
 
 private fun hueFromColor(color: Color): Float {
     val hsv = FloatArray(3)
@@ -257,7 +253,6 @@ fun MapScreen(mainViewModel: MainViewModel, mapaViewModel: MapaViewModel) {
                     Spacer(Modifier.height(16.dp))
                     Text("Categoria:")
                     Box(modifier = Modifier.fillMaxWidth()) {
-                        // Simples seletor de grupo
                         var expanded by remember { mutableStateOf(false) }
                         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
                             Text(selectedGrupo)
@@ -314,44 +309,36 @@ fun MapScreen(mainViewModel: MainViewModel, mapaViewModel: MapaViewModel) {
                     zoomControlsEnabled = true
                 )
             ) {
-                if (polylinePoints.isNotEmpty() || clientesRotaAtiva.isNotEmpty()) {
-                    if (polylinePoints.isNotEmpty()) {
-                        Polyline(
-                            points = polylinePoints,
-                            color = Color.Blue,
-                            width = 12f
-                        )
+                if (polylinePoints.isNotEmpty()) {
+                    Polyline(points = polylinePoints, color = Color.Blue, width = 12f)
+                }
+
+                clientesRotaAtiva.forEach { route ->
+                    val customFilter = mapaViewModel.getFiltroDoCliente(route.id)
+                    val colorHex = if (userProfile?.isGeomarkingEnabled == true) {
+                        customFilter?.corHex ?: mapaViewModel.getCorDoFiltro(route.grupoFiltro)
+                    } else {
+                        "#2196F3"
                     }
                     
-                    clientesRotaAtiva.forEach { route ->
-                        val markerColor = if (userProfile?.isGeomarkingEnabled == true) {
-                            Color(mapaViewModel.getCorDoFiltro(route.grupoFiltro).toColorInt())
-                        } else {
-                            Color.Blue // Cor padrão
-                        }
-
-                        key(route.id) {
-                            Marker(
-                                state = rememberMarkerState(position = LatLng(route.latitude, route.longitude)),
-                                title = route.clientName,
-                                snippet = route.address,
-                                icon = BitmapDescriptorFactory.defaultMarker(
-                                    hueFromColor(markerColor)
-                                )
-                            )
-                        }
+                    key(route.id) {
+                        Marker(
+                            state = rememberMarkerState(position = LatLng(route.latitude, route.longitude)),
+                            title = route.clientName,
+                            snippet = "Grupo: ${customFilter?.nome ?: route.grupoFiltro ?: "Sem Categoria"}",
+                            icon = BitmapDescriptorFactory.defaultMarker(hueFromColor(Color(colorHex.toColorInt())))
+                        )
                     }
                 }
             }
         }
 
-        // Botão flutuante para adicionar cliente
         FloatingActionButton(
             onClick = { showAddClientDialog = true },
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(16.dp)
-                .padding(top = 16.dp), // Abaixo do botão de bússola/topbar
+                .padding(top = 16.dp),
             containerColor = MaterialTheme.colorScheme.primaryContainer
         ) {
             Icon(Icons.Default.PersonAdd, contentDescription = "Novo Cliente")
@@ -372,6 +359,7 @@ fun MapScreen(mainViewModel: MainViewModel, mapaViewModel: MapaViewModel) {
                     cliente = clienteAtual,
                     userLocation = userLocation,
                     totalConcluido = totalAtendidos,
+                    mapaViewModel = mapaViewModel,
                     onNavegar = {
                         clienteAtual?.let {
                             val uri = Uri.parse("google.navigation:q=${it.latitude},${it.longitude}")
@@ -399,6 +387,7 @@ fun PainelControleViagem(
     cliente: Route?,
     userLocation: LatLng?,
     totalConcluido: Int,
+    mapaViewModel: MapaViewModel,
     onNavegar: () -> Unit,
     onCheckIn: (String) -> Unit,
     onFinalizar: () -> Unit
@@ -465,6 +454,10 @@ fun PainelControleViagem(
 
                 Column(modifier = Modifier.padding(if (isSmallScreen) 12.dp else 16.dp)) {
                     if (targetCliente != null) {
+                        val customFilter = mapaViewModel.getFiltroDoCliente(targetCliente.id)
+                        val filterName = customFilter?.nome ?: targetCliente.grupoFiltro ?: "Sem Categoria"
+                        val filterColor = Color((customFilter?.corHex ?: mapaViewModel.getCorDoFiltro(targetCliente.grupoFiltro)).toColorInt())
+
                         Text(
                             text = "Próximo Cliente:",
                             style = MaterialTheme.typography.labelSmall,
@@ -476,6 +469,14 @@ fun PainelControleViagem(
                             maxLines = 1,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
+                        
+                        Text(
+                            text = filterName,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = filterColor,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                        )
+
                         Text(
                             text = targetCliente.address, 
                             style = MaterialTheme.typography.bodyMedium,

@@ -14,6 +14,9 @@ interface FiltroCustomDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun salvar(filtro: FiltroCustomEntity)
 
-    @Query("DELETE FROM filtros_custom WHERE nome = :nome")
-    suspend fun deletar(nome: String)
+    @Query("DELETE FROM filtros_custom WHERE id = :id")
+    suspend fun deletar(id: Long)
+
+    @Query("SELECT * FROM filtros_custom WHERE idsClientes LIKE '%' || :clienteId || '%'")
+    suspend fun buscarFiltrosPorCliente(clienteId: String): List<FiltroCustomEntity>
 }

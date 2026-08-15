@@ -5,7 +5,8 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "filtros_custom")
 data class FiltroCustomEntity(
-    @PrimaryKey val nome: String,
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val nome: String,
     val corHex: String,
-    val idsClientes: String // Armazenado como CSV ou JSON string (ex: "id1,id2,id3")
+    val idsClientes: String // CSV de IDs
 )

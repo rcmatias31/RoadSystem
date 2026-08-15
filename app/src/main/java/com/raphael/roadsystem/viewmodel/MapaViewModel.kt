@@ -87,7 +87,7 @@ class MapaViewModel @Inject constructor(
     val selecionados: StateFlow<Set<String>> = _selecionados.asStateFlow()
 
     // 3. Grupos dinâmicos (Planilha + Custom)
-    private val filtrosCustom: StateFlow<List<FiltroCustomEntity>> = filtroCustomDao.listarTodos()
+    val filtrosCustom: StateFlow<List<FiltroCustomEntity>> = filtroCustomDao.listarTodos()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val gruposDisponiveis: StateFlow<List<String>> = combine(repository.listarGrupos(), filtrosCustom) { daPlanilha, custom ->
@@ -134,11 +134,22 @@ class MapaViewModel @Inject constructor(
         _filtroGrupo.value = grupo
     }
 
-    fun criarFiltroPersonalizado(nome: String, corHex: String) {
+    fun criarFiltroPersonalizado(nome: String, corHex: String, onResult: (String?) -> Unit = {}) {
         val selecionadosIds = _selecionados.value
         if (selecionadosIds.isEmpty()) return
         
         viewModelScope.launch {
+            // Validação: Verificar se algum cliente já está em outro filtro personalizado
+            val todosCustom = filtrosCustom.value
+            val clientesJaFiltrados = selecionadosIds.filter { id ->
+                todosCustom.any { it.idsClientes.split(",").contains(id) }
+            }
+
+            if (clientesJaFiltrados.isNotEmpty()) {
+                onResult("Alguns clientes já pertencem a outro filtro personalizado.")
+                return@launch
+            }
+
             val entity = FiltroCustomEntity(
                 nome = nome,
                 corHex = corHex,
@@ -147,6 +158,18 @@ class MapaViewModel @Inject constructor(
             filtroCustomDao.salvar(entity)
             limparSelecao()
             selecionarGrupo(nome)
+            onResult(null)
+        }
+    }
+
+    fun deletarFiltro(nome: String) {
+        viewModelScope.launch {
+            filtrosCustom.value.find { it.nome == nome }?.let {
+                filtroCustomDao.deletar(it.id)
+                if (_filtroGrupo.value == nome) {
+                    selecionarGrupo("Todos")
+                }
+            }
         }
     }
 
@@ -310,19 +333,6 @@ class MapaViewModel @Inject constructor(
         }
     }
 
-    fun reordenarClientes(novaOrdemIndices: List<Int>) {
-        val listaAtual = _listaIdsRotaAtiva.value
-        if (listaAtual.size < 2 || novaOrdemIndices.size != listaAtual.size) return
-        viewModelScope.launch {
-            try {
-                val listaReordenada = novaOrdemIndices.map { listaAtual[it] }
-                val entidades = listaReordenada.mapIndexed { index, id -> RotaAtivaEntity(id, index) }
-                rotaAtivaDao.limparRota()
-                rotaAtivaDao.salvarRota(entidades)
-            } catch (e: Exception) { Log.e("MapaViewModel", "Erro reordenar: ${e.message}") }
-        }
-    }
-
     fun stopNavigation() {
         _navInfo.value = NavigationInfo(isActive = false)
         _roadPolylinePoints.value = emptyList()
@@ -375,7 +385,16 @@ class MapaViewModel @Inject constructor(
     }
 
     fun getCorDoFiltro(grupo: String?): String {
-        return filtrosCustom.value.find { it.nome == grupo }?.corHex ?: "#2196F3"
+        // Primeiro busca em filtros customizados
+        val custom = filtrosCustom.value.find { it.nome == grupo }
+        if (custom != null) return custom.corHex
+        
+        // Fallback para cores padrão de categorias da planilha (opcional: mapear nomes conhecidos)
+        return "#2196F3" 
+    }
+
+    fun getFiltroDoCliente(clienteId: String): FiltroCustomEntity? {
+        return filtrosCustom.value.find { it.idsClientes.split(",").contains(clienteId) }
     }
 
     fun getFilteredRoutes(): List<Route> {
@@ -434,13 +453,17 @@ class MapaViewModel @Inject constructor(
                     val firstRoute = response.routes[0]
                     _roadPolylinePoints.value = PolylineDecoder.decodePolyline(firstRoute.overviewPolyline.points)
                     
-                    // Salvamos os IDs no BANCO DE DADOS para persistência
-                    val entidades = selectedRoutes.mapIndexed { index, route -> RotaAtivaEntity(route.id, index) }
+                    // Lógica de Otimização: Aplicar a ordem retornada pelo Google antes de salvar
+                    val optimizedIds = if (!firstRoute.waypointOrder.isNullOrEmpty()) {
+                        firstRoute.waypointOrder.map { index -> selectedRoutes[index].id }
+                    } else {
+                        selectedRoutes.map { it.id }
+                    }
+
+                    // Salvamos os IDs na ORDEM OTIMIZADA no BANCO DE DADOS
+                    val entidades = optimizedIds.mapIndexed { index, id -> RotaAtivaEntity(id, index) }
                     rotaAtivaDao.limparRota()
                     rotaAtivaDao.salvarRota(entidades)
-                    
-                    // Se o Google otimizou, reordenamos a lista no banco
-                    firstRoute.waypointOrder?.let { reordenarClientes(it) }
                     
                     var d = 0; var t = 0
                     firstRoute.legs.forEach { d += it.distance.value; t += it.duration.value }
