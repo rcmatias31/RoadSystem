@@ -42,72 +42,77 @@ fun TelaSelecaoClientes(
 
     Scaffold(
         topBar = {
-            Column {
-                TopAppBar(
-                    title = {
-                        Column {
-                            Text("Clientes ($selecionadosCount marcados)", style = MaterialTheme.typography.titleMedium)
-                            if (selecionadosCount > 23) {
+            Surface(tonalElevation = 3.dp) {
+                Column {
+                    TopAppBar(
+                        title = {
+                            Column {
+                                Text("Clientes", style = MaterialTheme.typography.titleMedium)
                                 Text(
-                                    "Limite Google Maps (23) excedido!",
+                                    text = "$selecionadosCount marcados",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.error
+                                    color = if (selecionadosCount > 23) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
+                        },
+                        actions = {
+                            IconButton(onClick = { viewModel.recarregarPlanilha() }) {
+                                Icon(Icons.Default.Refresh, contentDescription = "Recarregar")
+                            }
+                            IconButton(onClick = { viewModel.limparSelecao() }) {
+                                Icon(Icons.Default.DeleteSweep, contentDescription = "Limpar Seleção")
+                            }
+                            Checkbox(
+                                checked = isAllFilteredSelected,
+                                onCheckedChange = { viewModel.toggleSelectAllVisiveis() }
+                            )
                         }
-                    },
-                    actions = {
-                        IconButton(onClick = { viewModel.recarregarPlanilha() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Recarregar")
-                        }
-                        IconButton(onClick = { viewModel.limparSelecao() }) {
-                            Icon(Icons.Default.DeleteSweep, contentDescription = "Limpar Seleção")
-                        }
-                        Checkbox(
-                            checked = isAllFilteredSelected,
-                            onCheckedChange = { viewModel.toggleSelectAllVisiveis() },
-                            modifier = Modifier.padding(end = 8.dp)
+                    )
+                    
+                    // Barra de Pesquisa e Filtros em uma área mais compacta
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { viewModel.onSearchQueryChange(it) },
+                            modifier = Modifier.weight(1f),
+                            placeholder = { Text("Buscar...") },
+                            leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(20.dp)) },
+                            trailingIcon = {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
+                                        Icon(Icons.Default.Close, null, modifier = Modifier.size(20.dp))
+                                    }
+                                }
+                            },
+                            singleLine = true,
+                            shape = MaterialTheme.shapes.medium,
+                            textStyle = MaterialTheme.typography.bodyMedium
                         )
                     }
-                )
-                
-                // Barra de Pesquisa
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { viewModel.onSearchQueryChange(it) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    placeholder = { Text("Buscar cliente ou endereço...") },
-                    leadingIcon = { Icon(Icons.Default.Search, null) },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
-                                Icon(Icons.Default.Close, null)
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    shape = MaterialTheme.shapes.medium
-                )
 
-                // ITEM 1.3: FilterChips Dinâmicos
-                LazyRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(gruposDisponiveis) { grupo ->
-                        FilterChip(
-                            selected = filtroGrupo == grupo,
-                            onClick = { viewModel.selecionarGrupo(grupo) },
-                            label = { Text(grupo) },
-                            leadingIcon = if (filtroGrupo == grupo) {
-                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                            } else null
-                        )
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(gruposDisponiveis) { grupo ->
+                            FilterChip(
+                                selected = filtroGrupo == grupo,
+                                onClick = { viewModel.selecionarGrupo(grupo) },
+                                label = { Text(grupo, style = MaterialTheme.typography.labelMedium) },
+                                leadingIcon = if (filtroGrupo == grupo) {
+                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                } else null
+                            )
+                        }
                     }
                 }
             }
@@ -130,13 +135,13 @@ fun TelaSelecaoClientes(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp)
-                            .height(56.dp),
+                            .heightIn(min = 48.dp, max = 56.dp),
                         enabled = selecionadosCount in 1..23,
                         shape = MaterialTheme.shapes.large
                     ) {
                         Icon(Icons.Default.Route, null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Gerar Rota com $selecionadosCount Paradas")
+                        Text("Gerar Rota ($selecionadosCount)")
                     }
                 }
             }
@@ -153,18 +158,32 @@ fun TelaSelecaoClientes(
                     )
                 }
             } else {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 16.dp)
+                ) {
                     items(clientesFiltrados, key = { it.id }) { route ->
                         val isSelected = selecionados.contains(route.id)
                         
                         ListItem(
-                            headlineContent = { Text(route.clientName, fontWeight = FontWeight.SemiBold) },
+                            headlineContent = { 
+                                Text(
+                                    route.clientName, 
+                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.bodyLarge
+                                ) 
+                            },
                             supportingContent = { 
                                 Column {
-                                    Text(route.address, style = MaterialTheme.typography.bodySmall)
+                                    Text(
+                                        route.address, 
+                                        style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 2,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
                                     route.grupoFiltro?.let {
                                         Text(
-                                            text = "Grupo: $it",
+                                            text = it,
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.secondary
                                         )

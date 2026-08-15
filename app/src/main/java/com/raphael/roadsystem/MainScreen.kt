@@ -130,6 +130,7 @@ fun MainScreen(
         }
     ) {
         Scaffold(
+            modifier = Modifier.fillMaxSize(),
             topBar = {
                 CenterAlignedTopAppBar(
                     title = { 
@@ -140,7 +141,7 @@ fun MainScreen(
                             Screen.Historico.route -> "Histórico"
                             else -> "RoadSystem"
                         }
-                        Text(title) 
+                        Text(title, style = MaterialTheme.typography.titleMedium) 
                     },
                     navigationIcon = {
                         IconButton(onClick = { 
@@ -163,16 +164,21 @@ fun MainScreen(
                             model = user?.photoUrl,
                             contentDescription = "Foto de Perfil",
                             modifier = Modifier
-                                .padding(end = 16.dp)
+                                .padding(end = 8.dp)
                                 .size(32.dp)
                                 .clip(CircleShape),
                             contentScale = ContentScale.Crop
                         )
-                    }
+                    },
+                    windowInsets = WindowInsets.statusBars
                 )
             }
         ) { innerPadding ->
-            Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+            Box(modifier = Modifier
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
+                .fillMaxSize()
+            ) {
                 NavHost(navController = navController, startDestination = Screen.Mapa.route) {
                     composable(Screen.Mapa.route) {
                         MapScreen(mainViewModel, mapaViewModel)
@@ -327,102 +333,118 @@ fun PainelControleViagem(
         )
     }
 
-    Card(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
-            .animateContentSize(),
-        elevation = CardDefaults.cardElevation(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        AnimatedContent(
-            targetState = cliente,
-            transitionSpec = {
-                if (targetState != null && initialState != null) {
-                    // Transição entre clientes: Slide horizontal (Entra pela direita, sai pela esquerda)
-                    (slideInHorizontally { width -> width } + fadeIn())
-                        .togetherWith(slideOutHorizontally { width -> -width } + fadeOut())
-                } else {
-                    // Transição para o fim da rota ou início: Fade simples
-                    fadeIn().togetherWith(fadeOut())
-                }
-            },
-            label = "PainelViagemAnimation"
-        ) { targetCliente ->
-            val distancia = remember(targetCliente, userLocation) {
-                if (targetCliente != null && userLocation != null) {
-                    LocationUtils.calcularDistancia(userLocation, LatLng(targetCliente.latitude, targetCliente.longitude))
-                } else {
-                    Float.MAX_VALUE
-                }
-            }
-            
-            // Atualiza o estado para o Dialog ter o valor correto no momento do clique
-            SideEffect { lastDistanciaCalculada = distancia }
+        val isSmallScreen = maxWidth < 360.dp
 
-            Column(modifier = Modifier.padding(16.dp)) {
-                if (targetCliente != null) {
-                    Text(
-                        text = "Próximo Cliente:",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(text = targetCliente.clientName, style = MaterialTheme.typography.titleLarge)
-                    Text(text = targetCliente.address, style = MaterialTheme.typography.bodyMedium)
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Text(
-                        text = "Distância: ${distancia.toInt()} metros",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (distancia <= 150) Color.Green else MaterialTheme.colorScheme.onSurface
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = onNavegar,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Navegar")
-                        }
-                        Button(
-                            onClick = {
-                                if (distancia <= 150) {
-                                    onCheckIn("PRESENCIAL")
-                                } else {
-                                    showRemotoDialog = true
-                                }
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (distancia <= 150) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary
-                            )
-                        ) {
-                            Text("Check-in")
-                        }
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(),
+            elevation = CardDefaults.cardElevation(8.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            AnimatedContent(
+                targetState = cliente,
+                transitionSpec = {
+                    if (targetState != null && initialState != null) {
+                        (slideInHorizontally { width -> width } + fadeIn())
+                            .togetherWith(slideOutHorizontally { width -> -width } + fadeOut())
+                    } else {
+                        fadeIn().togetherWith(fadeOut())
                     }
-                } else {
-                    Text(
-                        text = "Jornada Concluída!",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color(0xFF4CAF50)
-                    )
-                    Text(
-                        text = "Total de atendimentos hoje: $totalConcluido",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = onFinalizar,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                    ) {
-                        Icon(Icons.Default.Home, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Retornar para a Base")
+                },
+                label = "PainelViagemAnimation"
+            ) { targetCliente ->
+                val distancia = remember(targetCliente, userLocation) {
+                    if (targetCliente != null && userLocation != null) {
+                        LocationUtils.calcularDistancia(userLocation, LatLng(targetCliente.latitude, targetCliente.longitude))
+                    } else {
+                        Float.MAX_VALUE
+                    }
+                }
+                
+                SideEffect { lastDistanciaCalculada = distancia }
+
+                Column(modifier = Modifier.padding(if (isSmallScreen) 12.dp else 16.dp)) {
+                    if (targetCliente != null) {
+                        Text(
+                            text = "Próximo Cliente:",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = targetCliente.clientName, 
+                            style = if (isSmallScreen) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = targetCliente.address, 
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 2,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Text(
+                            text = "Distância: ${distancia.toInt()} metros",
+                            style = if (isSmallScreen) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
+                            color = if (distancia <= 150) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurface
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = onNavegar,
+                                modifier = Modifier.weight(1f),
+                                contentPadding = if (isSmallScreen) PaddingValues(horizontal = 8.dp) else ButtonDefaults.ContentPadding
+                            ) {
+                                Text("Navegar", maxLines = 1)
+                            }
+                            Button(
+                                onClick = {
+                                    if (distancia <= 150) {
+                                        onCheckIn("PRESENCIAL")
+                                    } else {
+                                        showRemotoDialog = true
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (distancia <= 150) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary
+                                ),
+                                contentPadding = if (isSmallScreen) PaddingValues(horizontal = 8.dp) else ButtonDefaults.ContentPadding
+                            ) {
+                                Text("Check-in", maxLines = 1)
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = "Jornada Concluída!",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color(0xFF4CAF50)
+                        )
+                        Text(
+                            text = "Total de atendimentos hoje: $totalConcluido",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = onFinalizar,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                        ) {
+                            Icon(Icons.Default.Home, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Retornar para a Base")
+                        }
                     }
                 }
             }

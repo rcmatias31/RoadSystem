@@ -35,4 +35,5 @@ Construído com **Clean Architecture** e **MVVM**.
     - **Consulta por Calendário:** Interface com `DatePicker` para visualização de entregas em datas anteriores.
     - **Painel de Conclusão:** Resumo automático de atendimentos ao final da rota.
     - **Retorno Inteligente à Base:** Botão que calcula e inicia a navegação GPS para o endereço residencial do motorista.
+- **Interface Adaptativa e Responsiva:** Refatoração do layout para suporte a diversos tamanhos de smartphones. Implementada gestão de constraints de tela, tratamento de textos longos (Ellipsis) e ajustes de insets para uma experiência Edge-to-Edge fluida.
 - **Segurança e Build:** Configuração de build variants (Release/Debug) e tratamento automático de caracteres de escape em caminhos de arquivo no `local.properties`.
