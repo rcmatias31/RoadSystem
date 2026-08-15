@@ -13,6 +13,7 @@ import com.raphael.roadsystem.data.CheckInDao
 import com.raphael.roadsystem.data.ProfileDao
 import com.raphael.roadsystem.data.ClienteDao
 import com.raphael.roadsystem.data.CheckInHistoryDao
+import com.raphael.roadsystem.data.FiltroCustomDao
 import com.raphael.roadsystem.data.RotaAtivaDao
 import com.raphael.roadsystem.data.SheetsRepository
 import dagger.Module
@@ -56,6 +57,9 @@ object DataModule {
 
     @Provides
     fun provideCheckInHistoryDao(database: AppDatabase): CheckInHistoryDao = database.checkInHistoryDao()
+
+    @Provides
+    fun provideFiltroCustomDao(database: AppDatabase): FiltroCustomDao = database.filtroCustomDao()
 
     @Provides
     @Singleton

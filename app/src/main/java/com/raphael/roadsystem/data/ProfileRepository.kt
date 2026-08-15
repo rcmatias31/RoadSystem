@@ -17,20 +17,27 @@ class ProfileRepository @Inject constructor(
 ) {
     fun getUserProfile(): Flow<UserProfileEntity?> = profileDao.getProfile()
 
-    suspend fun saveProfile(name: String, address: String): Boolean = withContext(Dispatchers.IO) {
+    suspend fun saveProfile(
+        name: String,
+        address: String,
+        theme: String? = null,
+        isGeomarkingEnabled: Boolean? = null
+    ): Boolean = withContext(Dispatchers.IO) {
         try {
             val geocoder = Geocoder(context, Locale.getDefault())
-            // Converte endereço em coordenadas
             @Suppress("DEPRECATION")
             val addresses = geocoder.getFromLocationName(address, 1)
             
             if (!addresses.isNullOrEmpty()) {
                 val location = addresses[0]
                 val entity = UserProfileEntity(
+                    id = 1,
                     name = name,
                     address = address,
                     latitude = location.latitude,
-                    longitude = location.longitude
+                    longitude = location.longitude,
+                    theme = theme ?: "SISTEMA",
+                    isGeomarkingEnabled = isGeomarkingEnabled ?: false
                 )
                 profileDao.insertProfile(entity)
                 true
@@ -40,6 +47,13 @@ class ProfileRepository @Inject constructor(
         } catch (e: Exception) {
             e.printStackTrace()
             false
+        }
+    }
+
+    suspend fun updateConfig(theme: String, isGeomarkingEnabled: Boolean, currentProfile: UserProfileEntity?) = withContext(Dispatchers.IO) {
+        if (currentProfile != null) {
+            val updated = currentProfile.copy(theme = theme, isGeomarkingEnabled = isGeomarkingEnabled)
+            profileDao.insertProfile(updated)
         }
     }
 }

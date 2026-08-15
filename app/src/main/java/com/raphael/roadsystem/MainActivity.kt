@@ -38,9 +38,17 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            RoadSystemTheme {
-                val loginViewModel: LoginViewModel = hiltViewModel()
-                val mapaViewModel: MapaViewModel = hiltViewModel()
+            val loginViewModel: LoginViewModel = hiltViewModel()
+            val mapaViewModel: MapaViewModel = hiltViewModel()
+            
+            val userProfile by mapaViewModel.userProfile.collectAsState()
+            val darkTheme = when (userProfile?.theme) {
+                "LIGHT" -> false
+                "DARK" -> true
+                else -> androidx.compose.foundation.isSystemInDarkTheme()
+            }
+
+            RoadSystemTheme(darkTheme = darkTheme) {
                 val isLoggedIn by loginViewModel.isLoggedIn.collectAsState()
                 
                 LaunchedEffect(isLoggedIn) {

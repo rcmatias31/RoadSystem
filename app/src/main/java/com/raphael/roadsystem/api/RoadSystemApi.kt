@@ -18,7 +18,27 @@ interface RoadSystemApi {
         @Header("Authorization") token: String,
         @Body request: CheckInRequest
     ): CheckInResponse
+
+    @POST("add-client-api")
+    suspend fun addClient(
+        @Header("Authorization") token: String,
+        @Body request: AddClientRequest
+    ): AddClientResponse
 }
+
+data class AddClientRequest(
+    val id: String,
+    val clientName: String,
+    val address: String,
+    val latitude: Double,
+    val longitude: Double,
+    val grupoFiltro: String
+)
+
+data class AddClientResponse(
+    val success: Boolean,
+    val message: String
+)
 
 data class CheckInRequest(
     val routeId: String,

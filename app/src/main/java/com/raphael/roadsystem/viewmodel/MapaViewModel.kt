@@ -20,6 +20,8 @@ import com.raphael.roadsystem.data.CheckInHistoryEntity
 import com.raphael.roadsystem.data.CheckInPendenteEntity
 import com.raphael.roadsystem.data.ProfileRepository
 import com.raphael.roadsystem.data.ClienteEntity
+import com.raphael.roadsystem.data.FiltroCustomDao
+import com.raphael.roadsystem.data.FiltroCustomEntity
 import com.raphael.roadsystem.data.RotaAtivaDao
 import com.raphael.roadsystem.data.RotaAtivaEntity
 import com.raphael.roadsystem.data.SheetsRepository
@@ -49,6 +51,7 @@ class MapaViewModel @Inject constructor(
     private val checkInDao: CheckInDao,
     private val rotaAtivaDao: RotaAtivaDao,
     private val checkInHistoryDao: CheckInHistoryDao,
+    private val filtroCustomDao: FiltroCustomDao,
     private val workManager: WorkManager
 ) : ViewModel() {
 
@@ -83,14 +86,18 @@ class MapaViewModel @Inject constructor(
     private val _selecionados = MutableStateFlow<Set<String>>(emptySet())
     val selecionados: StateFlow<Set<String>> = _selecionados.asStateFlow()
 
-    // 3. Grupos dinâmicos com "Todos" no início
-    val gruposDisponiveis: StateFlow<List<String>> = repository.listarGrupos()
-        .map { listOf("Todos") + it }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = listOf("Todos")
-        )
+    // 3. Grupos dinâmicos (Planilha + Custom)
+    private val filtrosCustom: StateFlow<List<FiltroCustomEntity>> = filtroCustomDao.listarTodos()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val gruposDisponiveis: StateFlow<List<String>> = combine(repository.listarGrupos(), filtrosCustom) { daPlanilha, custom ->
+        val todos = listOf("Todos") + daPlanilha + custom.map { it.nome }
+        todos.distinct()
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = listOf("Todos")
+    )
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -99,7 +106,9 @@ class MapaViewModel @Inject constructor(
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     // 4. Emissão da lista filtrada combinando os estados
-    val clientesFiltrados: StateFlow<List<Route>> = combine(clientes, _searchQuery, _filtroGrupo) { lista, query, grupo ->
+    val clientesFiltrados: StateFlow<List<Route>> = combine(clientes, _searchQuery, _filtroGrupo, filtrosCustom) { lista, query, grupo, customFilters ->
+        val customFilter = customFilters.find { it.nome == grupo }
+        
         lista.map { 
             Route(it.id, it.nomeCliente, it.endereco, it.latitude, it.longitude, it.status, it.grupoFiltro) 
         }.filter { route ->
@@ -107,7 +116,14 @@ class MapaViewModel @Inject constructor(
                     route.clientName.contains(query, ignoreCase = true) || 
                     route.address.contains(query, ignoreCase = true)
             
-            val matchesGrupo = grupo == "Todos" || route.grupoFiltro == grupo
+            val matchesGrupo = when {
+                grupo == "Todos" -> true
+                customFilter != null -> {
+                    val ids = customFilter.idsClientes.split(",").toSet()
+                    ids.contains(route.id)
+                }
+                else -> route.grupoFiltro == grupo
+            }
             
             matchesQuery && matchesGrupo
         }
@@ -116,6 +132,22 @@ class MapaViewModel @Inject constructor(
     // Funções de Suporte Solicitadas
     fun selecionarGrupo(grupo: String) {
         _filtroGrupo.value = grupo
+    }
+
+    fun criarFiltroPersonalizado(nome: String, corHex: String) {
+        val selecionadosIds = _selecionados.value
+        if (selecionadosIds.isEmpty()) return
+        
+        viewModelScope.launch {
+            val entity = FiltroCustomEntity(
+                nome = nome,
+                corHex = corHex,
+                idsClientes = selecionadosIds.joinToString(",")
+            )
+            filtroCustomDao.salvar(entity)
+            limparSelecao()
+            selecionarGrupo(nome)
+        }
     }
 
     fun toggleCliente(id: String) {
@@ -143,6 +175,56 @@ class MapaViewModel @Inject constructor(
 
     fun recarregarPlanilha() {
         refreshRoutes()
+    }
+
+    /**
+     * Cadastro de cliente via GPS (Dashboard)
+     */
+    @SuppressLint("MissingPermission")
+    fun cadastrarClienteViaGPS(
+        nome: String,
+        grupo: String,
+        fusedLocationClient: FusedLocationProviderClient,
+        context: android.content.Context,
+        onComplete: (Result<Unit>) -> Unit
+    ) {
+        val token = lastIdToken ?: return
+        viewModelScope.launch {
+            try {
+                _isLoading.value = true
+                val location = fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, CancellationTokenSource().token).await()
+                if (location == null) {
+                    onComplete(Result.failure(Exception("GPS indisponível")))
+                    return@launch
+                }
+
+                // Geocodificação reversa para obter endereço
+                val geocoder = android.location.Geocoder(context, java.util.Locale.getDefault())
+                @Suppress("DEPRECATION")
+                val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
+                val endereco = if (!addresses.isNullOrEmpty()) {
+                    addresses[0].getAddressLine(0)
+                } else {
+                    "Endereço não identificado (${location.latitude}, ${location.longitude})"
+                }
+
+                val novoCliente = ClienteEntity(
+                    id = "NEW_${System.currentTimeMillis()}",
+                    nomeCliente = nome,
+                    endereco = endereco,
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    grupoFiltro = grupo
+                )
+
+                val result = repository.cadastrarNovoCliente(token, novoCliente)
+                onComplete(result)
+            } catch (e: Exception) {
+                onComplete(Result.failure(e))
+            } finally {
+                _isLoading.value = false
+            }
+        }
     }
 
     // --- Outros estados para navegação e perfil ---
@@ -290,6 +372,10 @@ class MapaViewModel @Inject constructor(
 
     fun onSearchQueryChange(newQuery: String) {
         _searchQuery.value = newQuery
+    }
+
+    fun getCorDoFiltro(grupo: String?): String {
+        return filtrosCustom.value.find { it.nome == grupo }?.corHex ?: "#2196F3"
     }
 
     fun getFilteredRoutes(): List<Route> {

@@ -26,11 +26,15 @@ fun TelaPerfil(
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf(firebaseUser?.email ?: "") }
     var homeAddress by remember { mutableStateOf("") }
+    var theme by remember { mutableStateOf("SISTEMA") }
+    var isGeomarkingEnabled by remember { mutableStateOf(false) }
 
     LaunchedEffect(profile) {
         profile?.let {
             name = it.name
             homeAddress = it.address
+            theme = it.theme
+            isGeomarkingEnabled = it.isGeomarkingEnabled
         } ?: run {
             name = firebaseUser?.displayName ?: ""
         }
@@ -43,7 +47,7 @@ fun TelaPerfil(
             .verticalScroll(rememberScrollState())
     ) {
         Text("Meu Perfil", style = MaterialTheme.typography.headlineMedium)
-        Text("Informe seu endereço residencial para ser usado como ponto final das rotas.", style = MaterialTheme.typography.bodyMedium)
+        Text("Gerencie suas informações e preferências do aplicativo.", style = MaterialTheme.typography.bodyMedium)
         
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -55,15 +59,50 @@ fun TelaPerfil(
             modifier = Modifier.fillMaxWidth()
         )
 
+        Spacer(modifier = Modifier.height(24.dp))
+        HorizontalDivider()
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text("Preferências", style = MaterialTheme.typography.titleMedium)
+        
         Spacer(modifier = Modifier.height(16.dp))
 
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("E-mail") },
+        // Seleção de Tema
+        Text("Tema do Aplicativo", style = MaterialTheme.typography.labelMedium)
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            enabled = false 
-        )
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf("LIGHT", "DARK", "SISTEMA").forEach { t ->
+                FilterChip(
+                    selected = theme == t,
+                    onClick = { theme = t },
+                    label = { Text(t) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Geomarcação
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Habilitar geomarcação por filtro", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "Exibe marcadores coloridos no mapa de acordo com a categoria/grupo.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            Switch(
+                checked = isGeomarkingEnabled,
+                onCheckedChange = { isGeomarkingEnabled = it }
+            )
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
         HorizontalDivider()
@@ -76,7 +115,7 @@ fun TelaPerfil(
         OutlinedTextField(
             value = homeAddress,
             onValueChange = { homeAddress = it },
-            label = { Text("Ex: Rua das Flores, 123, São Paulo - SP") },
+            label = { Text("Endereço residencial") },
             placeholder = { Text("Rua, número, cidade e estado") },
             leadingIcon = { Icon(Icons.Default.Home, null) },
             modifier = Modifier.fillMaxWidth()
@@ -86,7 +125,7 @@ fun TelaPerfil(
 
         Button(
             onClick = {
-                viewModel.saveProfile(name, homeAddress) { success ->
+                viewModel.saveProfile(name, homeAddress, theme, isGeomarkingEnabled) { success ->
                     if (success) onSaveSuccess()
                 }
             },

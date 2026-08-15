@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [ClienteEntity::class, UserProfileEntity::class, CheckInPendenteEntity::class, RotaAtivaEntity::class, CheckInHistoryEntity::class], version = 8, exportSchema = false)
+@Database(entities = [ClienteEntity::class, UserProfileEntity::class, CheckInPendenteEntity::class, RotaAtivaEntity::class, CheckInHistoryEntity::class, FiltroCustomEntity::class], version = 9, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun clienteDao(): ClienteDao
@@ -13,6 +13,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun checkInDao(): CheckInDao
     abstract fun rotaAtivaDao(): RotaAtivaDao
     abstract fun checkInHistoryDao(): CheckInHistoryDao
+    abstract fun filtroCustomDao(): FiltroCustomDao
 
     companion object {
         @Volatile

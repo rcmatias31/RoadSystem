@@ -1,6 +1,7 @@
 package com.raphael.roadsystem.data
 
 import android.util.Log
+import com.raphael.roadsystem.api.AddClientRequest
 import com.raphael.roadsystem.api.RoadSystemApi
 import com.raphael.roadsystem.api.RouteDto
 import com.raphael.roadsystem.utils.GeoUtils
@@ -27,6 +28,34 @@ class SheetsRepository @Inject constructor(
      * Retorna os grupos únicos disponíveis para filtro.
      */
     fun listarGrupos(): Flow<List<String>> = clienteDao.listarGrupos()
+
+    /**
+     * Cadastra um novo cliente via API e salva localmente.
+     */
+    suspend fun cadastrarNovoCliente(token: String, cliente: ClienteEntity): Result<Unit> {
+        return try {
+            val response = api.addClient(
+                token = "Bearer $token",
+                request = AddClientRequest(
+                    id = cliente.id,
+                    clientName = cliente.nomeCliente,
+                    address = cliente.endereco,
+                    latitude = cliente.latitude,
+                    longitude = cliente.longitude,
+                    grupoFiltro = cliente.grupoFiltro
+                )
+            )
+
+            if (response.success) {
+                clienteDao.salvarTodos(listOf(cliente))
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception(response.message))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
     /**
      * Sincroniza dados da API com o Room.

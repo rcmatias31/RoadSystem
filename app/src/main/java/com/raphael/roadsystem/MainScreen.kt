@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.toColorInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
@@ -34,6 +35,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.auth.FirebaseAuth
 import com.google.maps.android.compose.*
@@ -44,6 +46,18 @@ import com.raphael.roadsystem.utils.LocationUtils
 import com.raphael.roadsystem.viewmodel.MapaViewModel
 import com.raphael.roadsystem.viewmodel.flows.MainViewModel
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.PersonAdd
+
+private fun hueFromColor(color: Color): Float {
+    val hsv = FloatArray(3)
+    android.graphics.Color.RGBToHSV(
+        (color.red * 255).toInt(),
+        (color.green * 255).toInt(),
+        (color.blue * 255).toInt(),
+        hsv
+    )
+    return hsv[0]
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -215,9 +229,68 @@ fun MapScreen(mainViewModel: MainViewModel, mapaViewModel: MapaViewModel) {
     val clientesRotaAtiva by mapaViewModel.clientesRotaAtiva.collectAsStateWithLifecycle()
     val totalAtendidos by mapaViewModel.totalAtendidosHoje.collectAsStateWithLifecycle()
     val isLoading by mapaViewModel.isLoading.collectAsStateWithLifecycle()
+    val userProfile by mapaViewModel.userProfile.collectAsStateWithLifecycle()
+    val grupos by mapaViewModel.gruposDisponiveis.collectAsStateWithLifecycle()
+    
     val cameraPositionState = rememberCameraPositionState()
     
+    var showAddClientDialog by remember { mutableStateOf(false) }
+    var newClientName by remember { mutableStateOf("") }
+    var selectedGrupo by remember { mutableStateOf("Sem Categoria") }
+
     val fusedLocationClient = remember { com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context) }
+
+    if (showAddClientDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddClientDialog = false },
+            title = { Text("Cadastrar Novo Cliente") },
+            text = {
+                Column {
+                    Text("O cliente será cadastrado na sua localização atual.")
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = newClientName,
+                        onValueChange = { newClientName = it },
+                        label = { Text("Nome do Cliente") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text("Categoria:")
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        // Simples seletor de grupo
+                        var expanded by remember { mutableStateOf(false) }
+                        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text(selectedGrupo)
+                        }
+                        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                            grupos.filter { it != "Todos" }.forEach { g ->
+                                DropdownMenuItem(
+                                    text = { Text(g) },
+                                    onClick = { selectedGrupo = g; expanded = false }
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    mapaViewModel.cadastrarClienteViaGPS(newClientName, selectedGrupo, fusedLocationClient, context) { result ->
+                        if (result.isSuccess) {
+                            Toast.makeText(context, "Cliente cadastrado!", Toast.LENGTH_SHORT).show()
+                            showAddClientDialog = false
+                            newClientName = ""
+                        } else {
+                            Toast.makeText(context, "Erro: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }, enabled = newClientName.isNotBlank()) { Text("Salvar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddClientDialog = false }) { Text("Cancelar") }
+            }
+        )
+    }
 
     LaunchedEffect(userLocation) {
         userLocation?.let {
@@ -251,16 +324,37 @@ fun MapScreen(mainViewModel: MainViewModel, mapaViewModel: MapaViewModel) {
                     }
                     
                     clientesRotaAtiva.forEach { route ->
+                        val markerColor = if (userProfile?.isGeomarkingEnabled == true) {
+                            Color(mapaViewModel.getCorDoFiltro(route.grupoFiltro).toColorInt())
+                        } else {
+                            Color.Blue // Cor padrão
+                        }
+
                         key(route.id) {
                             Marker(
                                 state = rememberMarkerState(position = LatLng(route.latitude, route.longitude)),
                                 title = route.clientName,
-                                snippet = route.address
+                                snippet = route.address,
+                                icon = BitmapDescriptorFactory.defaultMarker(
+                                    hueFromColor(markerColor)
+                                )
                             )
                         }
                     }
                 }
             }
+        }
+
+        // Botão flutuante para adicionar cliente
+        FloatingActionButton(
+            onClick = { showAddClientDialog = true },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+                .padding(top = 16.dp), // Abaixo do botão de bússola/topbar
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        ) {
+            Icon(Icons.Default.PersonAdd, contentDescription = "Novo Cliente")
         }
 
         if ((userLocation == null && mainViewModel.hasLocationPermission) || isLoading) {

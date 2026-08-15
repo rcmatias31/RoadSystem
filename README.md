@@ -36,4 +36,9 @@ Construído com **Clean Architecture** e **MVVM**.
     - **Painel de Conclusão:** Resumo automático de atendimentos ao final da rota.
     - **Retorno Inteligente à Base:** Botão que calcula e inicia a navegação GPS para o endereço residencial do motorista.
 - **Interface Adaptativa e Responsiva:** Refatoração do layout para suporte a diversos tamanhos de smartphones. Implementada gestão de constraints de tela, tratamento de textos longos (Ellipsis) e ajustes de insets para uma experiência Edge-to-Edge fluida.
+- **Filtros e Gestão de Campo (Novas Funcionalidades):**
+    - **Filtros Personalizados:** Criação de grupos de clientes com nomes e cores customizáveis diretamente pelo motorista.
+    - **Cadastro via GPS:** Registro de novos clientes no mapa e na planilha usando a localização atual, com geocodificação reversa para preenchimento automático de endereço.
+    - **Temas Dinâmicos:** Configuração de tema (Claro, Escuro ou Sistema) no perfil do usuário.
+    - **Geomarcação Colorida:** Visualização de marcadores no mapa com as cores atribuídas aos filtros/categorias (Geomarking Enabled).
 - **Segurança e Build:** Configuração de build variants (Release/Debug) e tratamento automático de caracteres de escape em caminhos de arquivo no `local.properties`.

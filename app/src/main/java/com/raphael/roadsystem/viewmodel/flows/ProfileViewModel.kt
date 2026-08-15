@@ -27,9 +27,9 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    fun saveProfile(name: String, address: String, onComplete: (Boolean) -> Unit) {
+    fun saveProfile(name: String, address: String, theme: String, isGeomarkingEnabled: Boolean, onComplete: (Boolean) -> Unit) {
         viewModelScope.launch {
-            val success = repository.saveProfile(name, address)
+            val success = repository.saveProfile(name, address, theme, isGeomarkingEnabled)
             onComplete(success)
         }
     }
