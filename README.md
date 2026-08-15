@@ -35,10 +35,18 @@ Construído com **Clean Architecture** e **MVVM**.
     - **Consulta por Calendário:** Interface com `DatePicker` para visualização de entregas em datas anteriores.
     - **Painel de Conclusão:** Resumo automático de atendimentos ao final da rota.
     - **Retorno Inteligente à Base:** Botão que calcula e inicia a navegação GPS para o endereço residencial do motorista.
-- **Interface Adaptativa e Responsiva:** Refatoração do layout para suporte a diversos tamanhos de smartphones. Implementada gestão de constraints de tela, tratamento de textos longos (Ellipsis) e ajustes de insets para uma experiência Edge-to-Edge fluida.
+- **Interface Adaptativa e Responsiva:** Refatoração do layout para suporte a diversos tamanhos de smartphones. Implementada gestão de constraints de tela, tratamento de textos longos (Ellipsis) e ajustes de insets para uma experiência **Edge-to-Edge** fluida, incluindo correção automática de sobreposição do teclado (**WindowInsets.ime**).
 - **Filtros e Gestão de Campo (Novas Funcionalidades):**
     - **Filtros Personalizados:** Criação de grupos de clientes com nomes e cores customizáveis diretamente pelo motorista.
     - **Cadastro via GPS:** Registro de novos clientes no mapa e na planilha usando a localização atual, com geocodificação reversa para preenchimento automático de endereço.
+    - **Exclusão Individual e em Massa:** Implementado sistema de remoção de clientes (local e na planilha) com suporte a ações em lote para limpeza rápida da base.
     - **Temas Dinâmicos:** Configuração de tema (Claro, Escuro ou Sistema) no perfil do usuário.
     - **Geomarcação Colorida:** Visualização de marcadores no mapa com as cores atribuídas aos filtros/categorias (Geomarking Enabled).
-- **Segurança e Build:** Configuração de build variants (Release/Debug) e tratamento automático de caracteres de escape em caminhos de arquivo no `local.properties`.
+- **Integração Direta com Google Sheets (v1.1):** 
+    - Migração da persistência de dados para a **Google Sheets API nativa** utilizando Service Account.
+    - Eliminação de dependências de endpoints instáveis, garantindo gravação direta na planilha (Colunas A-E).
+    - Sincronização robusta via **WorkManager** para operações de adição e exclusão em segundo plano.
+- **Segurança e Estabilidade:** 
+    - Atualização do banco de dados Room (v11) para suporte a novos esquemas.
+    - Sistema de versão informativa no perfil para controle de deploys.
+    - Tratamento automático de caracteres de escape em caminhos de arquivo no `local.properties`.

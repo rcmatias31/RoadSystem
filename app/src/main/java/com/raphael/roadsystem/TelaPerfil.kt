@@ -22,6 +22,7 @@ fun TelaPerfil(
 ) {
     val profile by viewModel.uiState.collectAsState()
     val firebaseUser = FirebaseAuth.getInstance().currentUser
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf(firebaseUser?.email ?: "") }
@@ -134,6 +135,32 @@ fun TelaPerfil(
             Icon(Icons.Default.Save, null)
             Spacer(modifier = Modifier.width(8.dp))
             Text("Salvar Perfil")
+        }
+
+        Spacer(modifier = Modifier.weight(1f)) // Empurra a versão para o final se houver espaço
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Seção de Versão e Informações do App
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "RoadSystem v${com.raphael.roadsystem.BuildConfig.VERSION_NAME}",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+            TextButton(onClick = {
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/seu-repositorio/roadsystem/releases"))
+                context.startActivity(intent)
+            }) {
+                Text("Verificar atualizações", style = MaterialTheme.typography.bodySmall)
+            }
+            Text(
+                text = "© 2026 Raphael - Desenvolvido para Logística",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            )
         }
     }
 }

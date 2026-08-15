@@ -1,6 +1,8 @@
 package com.raphael.roadsystem
 
 import android.widget.Toast
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.google.android.gms.location.LocationServices
 import com.raphael.roadsystem.ui.components.ClientItemShimmer
 import com.raphael.roadsystem.viewmodel.MapaViewModel
+import com.raphael.roadsystem.model.Route
 import androidx.core.graphics.toColorInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,9 +50,43 @@ fun TelaSelecaoClientes(
     var selectedColorHex by remember { mutableStateOf("#2196F3") }
     
     var filterToDelete by remember { mutableStateOf<String?>(null) }
+    
+    var clientToMove by remember { mutableStateOf<Route?>(null) }
+    var showMoveDialog by remember { mutableStateOf(false) }
+
+    var clientToDelete by remember { mutableStateOf<Route?>(null) }
+    var showMassDeleteDialog by remember { mutableStateOf(false) }
 
     val selecionadosCount = selecionados.size
     val isAllFilteredSelected = clientesFiltrados.isNotEmpty() && clientesFiltrados.all { selecionados.contains(it.id) }
+
+    if (showMoveDialog && clientToMove != null) {
+        AlertDialog(
+            onDismissRequest = { showMoveDialog = false },
+            title = { Text("Alterar Grupo de ${clientToMove?.clientName}") },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
+                    // Filtramos "Todos" pois ele não é um grupo de destino real, é um estado de visão
+                    gruposDisponiveis.filter { it != "Todos" }.forEach { grupo ->
+                        ListItem(
+                            headlineContent = { Text(grupo) },
+                            modifier = Modifier.clickable {
+                                viewModel.alterarGrupoCliente(clientToMove!!.id, grupo)
+                                showMoveDialog = false
+                            },
+                            trailingContent = {
+                                if (clientToMove?.grupoFiltro == grupo) {
+                                    Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        )
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { showMoveDialog = false }) { Text("Cancelar") } }
+        )
+    }
 
     if (filterToDelete != null) {
         AlertDialog(
@@ -126,7 +163,42 @@ fun TelaSelecaoClientes(
         )
     }
 
+    if (clientToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { clientToDelete = null },
+            title = { Text("Excluir Cliente") },
+            text = { Text("Deseja realmente excluir \"${clientToDelete?.clientName}\" do aplicativo e da planilha?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.excluirCliente(clientToDelete!!.id)
+                    clientToDelete = null
+                }) { Text("Excluir", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { clientToDelete = null }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    if (showMassDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showMassDeleteDialog = false },
+            title = { Text("Excluir Clientes") },
+            text = { Text("Deseja realmente excluir os $selecionadosCount clientes selecionados do aplicativo e da planilha?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.excluirSelecionados()
+                    showMassDeleteDialog = false
+                }) { Text("Excluir", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMassDeleteDialog = false }) { Text("Cancelar") }
+            }
+        )
+    }
+
     Scaffold(
+        contentWindowInsets = ScaffoldDefaults.contentWindowInsets.union(WindowInsets.ime),
         topBar = {
             Surface(tonalElevation = 3.dp) {
                 Column {
@@ -143,6 +215,9 @@ fun TelaSelecaoClientes(
                         },
                         actions = {
                             if (selecionadosCount > 0) {
+                                IconButton(onClick = { showMassDeleteDialog = true }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Excluir Selecionados", tint = MaterialTheme.colorScheme.error)
+                                }
                                 IconButton(onClick = { 
                                     newFilterName = ""
                                     selectedColorHex = "#2196F3"
@@ -257,7 +332,7 @@ fun TelaSelecaoClientes(
             }
         }
     ) { padding ->
-        Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+        Box(modifier = Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize()) {
             if (isLoading) {
                 Column { repeat(8) { ClientItemShimmer() } }
             } else if (clientesFiltrados.isEmpty()) {
@@ -295,7 +370,8 @@ fun TelaSelecaoClientes(
                                         Text(
                                             text = it,
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.secondary
+                                            color = Color(viewModel.getCorDoFiltro(it).toColorInt()),
+                                            fontWeight = FontWeight.Bold
                                         )
                                     }
                                 }
@@ -305,6 +381,36 @@ fun TelaSelecaoClientes(
                                     checked = isSelected,
                                     onCheckedChange = { viewModel.toggleCliente(route.id) }
                                 )
+                            },
+                            trailingContent = {
+                                Box {
+                                    var menuExpanded by remember { mutableStateOf(false) }
+                                    IconButton(onClick = { menuExpanded = true }) {
+                                        Icon(Icons.Default.MoreVert, contentDescription = "Opções")
+                                    }
+                                    DropdownMenu(
+                                        expanded = menuExpanded,
+                                        onDismissRequest = { menuExpanded = false }
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text("Alterar Grupo") },
+                                            onClick = {
+                                                menuExpanded = false
+                                                clientToMove = route
+                                                showMoveDialog = true
+                                            },
+                                            leadingIcon = { Icon(Icons.Default.DriveFileMove, null) }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Excluir Cliente", color = MaterialTheme.colorScheme.error) },
+                                            onClick = {
+                                                menuExpanded = false
+                                                clientToDelete = route
+                                            },
+                                            leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) }
+                                        )
+                                    }
+                                }
                             },
                             modifier = Modifier.padding(horizontal = 4.dp)
                         )

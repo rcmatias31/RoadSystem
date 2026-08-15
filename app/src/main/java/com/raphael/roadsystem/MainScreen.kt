@@ -69,6 +69,65 @@ fun MainScreen(
     val navBackStackEntry = navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry.value?.destination?.route
 
+    // Estados para Cadastro de Cliente (Movidos para a TopBar)
+    val context = LocalContext.current
+    val grupos by mapaViewModel.gruposDisponiveis.collectAsStateWithLifecycle()
+    var showAddClientDialog by remember { mutableStateOf(false) }
+    var newClientName by remember { mutableStateOf("") }
+    var selectedGrupo by remember { mutableStateOf("Sem Categoria") }
+    val fusedLocationClient = remember { com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context) }
+
+    if (showAddClientDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddClientDialog = false },
+            title = { Text("Cadastrar Novo Cliente") },
+            text = {
+                Column {
+                    Text("O cliente será cadastrado na sua localização atual.")
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = newClientName,
+                        onValueChange = { newClientName = it },
+                        label = { Text("Nome do Cliente") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text("Categoria:")
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        var expanded by remember { mutableStateOf(false) }
+                        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text(selectedGrupo)
+                        }
+                        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                            grupos.filter { it != "Todos" }.forEach { g ->
+                                DropdownMenuItem(
+                                    text = { Text(g) },
+                                    onClick = { selectedGrupo = g; expanded = false }
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    mapaViewModel.cadastrarClienteViaGPS(newClientName, selectedGrupo, fusedLocationClient, context) { result ->
+                        if (result.isSuccess) {
+                            Toast.makeText(context, "Cliente salvo localmente! Sincronização em fila.", Toast.LENGTH_SHORT).show()
+                            showAddClientDialog = false
+                            newClientName = ""
+                        } else {
+                            Toast.makeText(context, "Erro: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }, enabled = newClientName.isNotBlank()) { Text("Salvar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddClientDialog = false }) { Text("Cancelar") }
+            }
+        )
+    }
+
     // Permissões de GPS
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -141,6 +200,7 @@ fun MainScreen(
     ) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
+            contentWindowInsets = ScaffoldDefaults.contentWindowInsets.union(WindowInsets.ime),
             topBar = {
                 CenterAlignedTopAppBar(
                     title = { 
@@ -170,6 +230,11 @@ fun MainScreen(
                         }
                     },
                     actions = {
+                        if (currentRoute == Screen.Mapa.route) {
+                            IconButton(onClick = { showAddClientDialog = true }) {
+                                Icon(Icons.Default.PersonAdd, contentDescription = "Novo Cliente")
+                            }
+                        }
                         AsyncImage(
                             model = user?.photoUrl,
                             contentDescription = "Foto de Perfil",
@@ -226,66 +291,9 @@ fun MapScreen(mainViewModel: MainViewModel, mapaViewModel: MapaViewModel) {
     val totalAtendidos by mapaViewModel.totalAtendidosHoje.collectAsStateWithLifecycle()
     val isLoading by mapaViewModel.isLoading.collectAsStateWithLifecycle()
     val userProfile by mapaViewModel.userProfile.collectAsStateWithLifecycle()
-    val grupos by mapaViewModel.gruposDisponiveis.collectAsStateWithLifecycle()
     
     val cameraPositionState = rememberCameraPositionState()
-    
-    var showAddClientDialog by remember { mutableStateOf(false) }
-    var newClientName by remember { mutableStateOf("") }
-    var selectedGrupo by remember { mutableStateOf("Sem Categoria") }
-
     val fusedLocationClient = remember { com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context) }
-
-    if (showAddClientDialog) {
-        AlertDialog(
-            onDismissRequest = { showAddClientDialog = false },
-            title = { Text("Cadastrar Novo Cliente") },
-            text = {
-                Column {
-                    Text("O cliente será cadastrado na sua localização atual.")
-                    Spacer(Modifier.height(16.dp))
-                    OutlinedTextField(
-                        value = newClientName,
-                        onValueChange = { newClientName = it },
-                        label = { Text("Nome do Cliente") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Text("Categoria:")
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        var expanded by remember { mutableStateOf(false) }
-                        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
-                            Text(selectedGrupo)
-                        }
-                        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                            grupos.filter { it != "Todos" }.forEach { g ->
-                                DropdownMenuItem(
-                                    text = { Text(g) },
-                                    onClick = { selectedGrupo = g; expanded = false }
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    mapaViewModel.cadastrarClienteViaGPS(newClientName, selectedGrupo, fusedLocationClient, context) { result ->
-                        if (result.isSuccess) {
-                            Toast.makeText(context, "Cliente cadastrado!", Toast.LENGTH_SHORT).show()
-                            showAddClientDialog = false
-                            newClientName = ""
-                        } else {
-                            Toast.makeText(context, "Erro: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
-                        }
-                    }
-                }, enabled = newClientName.isNotBlank()) { Text("Salvar") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddClientDialog = false }) { Text("Cancelar") }
-            }
-        )
-    }
 
     LaunchedEffect(userLocation) {
         userLocation?.let {
@@ -314,9 +322,8 @@ fun MapScreen(mainViewModel: MainViewModel, mapaViewModel: MapaViewModel) {
                 }
 
                 clientesRotaAtiva.forEach { route ->
-                    val customFilter = mapaViewModel.getFiltroDoCliente(route.id)
                     val colorHex = if (userProfile?.isGeomarkingEnabled == true) {
-                        customFilter?.corHex ?: mapaViewModel.getCorDoFiltro(route.grupoFiltro)
+                        mapaViewModel.getCorDoFiltro(route.grupoFiltro) 
                     } else {
                         "#2196F3"
                     }
@@ -325,23 +332,12 @@ fun MapScreen(mainViewModel: MainViewModel, mapaViewModel: MapaViewModel) {
                         Marker(
                             state = rememberMarkerState(position = LatLng(route.latitude, route.longitude)),
                             title = route.clientName,
-                            snippet = "Grupo: ${customFilter?.nome ?: route.grupoFiltro ?: "Sem Categoria"}",
+                            snippet = "Grupo: ${route.grupoFiltro ?: "Sem Categoria"}",
                             icon = BitmapDescriptorFactory.defaultMarker(hueFromColor(Color(colorHex.toColorInt())))
                         )
                     }
                 }
             }
-        }
-
-        FloatingActionButton(
-            onClick = { showAddClientDialog = true },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp)
-                .padding(top = 16.dp),
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        ) {
-            Icon(Icons.Default.PersonAdd, contentDescription = "Novo Cliente")
         }
 
         if ((userLocation == null && mainViewModel.hasLocationPermission) || isLoading) {
@@ -399,7 +395,7 @@ fun PainelControleViagem(
         AlertDialog(
             onDismissRequest = { showRemotoDialog = false },
             title = { Text("Aviso de Distância") },
-            text = { Text("Você está a ${lastDistanciaCalculada.toInt()} metros do destino. Deseja registrar este atendimento como REMOTO?") },
+            text = { Text("Você está a ${LocationUtils.formatarDistancia(lastDistanciaCalculada)} do destino. Deseja registrar este atendimento como REMOTO?") },
             confirmButton = {
                 Button(onClick = {
                     onCheckIn("REMOTO")
@@ -454,9 +450,8 @@ fun PainelControleViagem(
 
                 Column(modifier = Modifier.padding(if (isSmallScreen) 12.dp else 16.dp)) {
                     if (targetCliente != null) {
-                        val customFilter = mapaViewModel.getFiltroDoCliente(targetCliente.id)
-                        val filterName = customFilter?.nome ?: targetCliente.grupoFiltro ?: "Sem Categoria"
-                        val filterColor = Color((customFilter?.corHex ?: mapaViewModel.getCorDoFiltro(targetCliente.grupoFiltro)).toColorInt())
+                        val filterName = targetCliente.grupoFiltro ?: "Sem Categoria"
+                        val filterColor = Color(mapaViewModel.getCorDoFiltro(filterName).toColorInt())
 
                         Text(
                             text = "Próximo Cliente:",
@@ -487,7 +482,7 @@ fun PainelControleViagem(
                         Spacer(modifier = Modifier.height(8.dp))
                         
                         Text(
-                            text = "Distância: ${distancia.toInt()} metros",
+                            text = "Distância: ${LocationUtils.formatarDistancia(distancia)}",
                             style = if (isSmallScreen) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
                             color = if (distancia <= 150) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurface
                         )

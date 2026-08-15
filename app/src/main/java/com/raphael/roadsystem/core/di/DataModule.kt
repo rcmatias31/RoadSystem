@@ -16,11 +16,13 @@ import com.raphael.roadsystem.data.CheckInHistoryDao
 import com.raphael.roadsystem.data.FiltroCustomDao
 import com.raphael.roadsystem.data.RotaAtivaDao
 import com.raphael.roadsystem.data.SheetsRepository
+import com.google.api.services.sheets.v4.Sheets
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Module
@@ -79,7 +81,13 @@ object DataModule {
 
     @Provides
     @Singleton
-    fun provideSheetsRepository(clienteDao: ClienteDao, api: RoadSystemApi): SheetsRepository {
-        return SheetsRepository(clienteDao, api)
+    fun provideSheetsRepository(
+        clienteDao: ClienteDao, 
+        api: RoadSystemApi,
+        workManager: WorkManager,
+        sheetsService: Sheets,
+        @Named("spreadsheetId") spreadsheetId: String
+    ): SheetsRepository {
+        return SheetsRepository(clienteDao, api, workManager, sheetsService, spreadsheetId)
     }
 }

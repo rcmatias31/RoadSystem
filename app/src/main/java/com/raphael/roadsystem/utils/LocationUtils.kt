@@ -17,4 +17,17 @@ object LocationUtils {
         )
         return results[0]
     }
+
+    /**
+     * Formata a distância para exibição amigável.
+     * < 1km: Metros (m)
+     * >= 1km: Quilômetros (km)
+     */
+    fun formatarDistancia(metros: Float): String {
+        return if (metros < 1000) {
+            "${metros.toInt()} m"
+        } else {
+            "%.1f km".format(metros / 1000f)
+        }
+    }
 }

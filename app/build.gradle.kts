@@ -26,8 +26,8 @@ android {
         applicationId = "com.raphael.roadsystem"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -125,7 +125,12 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.lifecycleRuntimeCompose)
 
-    // 7. Testing
+    // 7. Google Sheets API Direct Sync
+    implementation(libs.googleApiClientAndroid)
+    implementation(libs.googleApiServicesSheets)
+    implementation(libs.googleAuthLibraryOauth2Http)
+
+    // 8. Testing
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
@@ -135,8 +140,29 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
 
-// Remove as duplicatas que conflitam com o Navigation SDK
+// Remove as duplicatas que conflitam com o Navigation SDK e Google API Client
 configurations.all {
     // Resolve o erro do Manifest Merger (Cronet)
     exclude(group = "org.chromium.net", module = "cronet-fallback")
+    
+    // Resolve conflitos da Google API Client Library
+    exclude(group = "com.google.guava", module = "listenablefuture")
+    exclude(group = "org.apache.httpcomponents", module = "httpclient")
+}
+
+android {
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/DEPENDENCIES"
+            excludes += "META-INF/LICENSE"
+            excludes += "META-INF/LICENSE.txt"
+            excludes += "META-INF/license.txt"
+            excludes += "META-INF/NOTICE"
+            excludes += "META-INF/NOTICE.txt"
+            excludes += "META-INF/notice.txt"
+            excludes += "META-INF/ASL2.0"
+            excludes += "META-INF/INDEX.LIST"
+        }
+    }
 }

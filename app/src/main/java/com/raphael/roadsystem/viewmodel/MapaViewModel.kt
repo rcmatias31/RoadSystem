@@ -19,6 +19,7 @@ import com.raphael.roadsystem.data.CheckInHistoryDao
 import com.raphael.roadsystem.data.CheckInHistoryEntity
 import com.raphael.roadsystem.data.CheckInPendenteEntity
 import com.raphael.roadsystem.data.ProfileRepository
+import com.raphael.roadsystem.data.ClienteDao
 import com.raphael.roadsystem.data.ClienteEntity
 import com.raphael.roadsystem.data.FiltroCustomDao
 import com.raphael.roadsystem.data.FiltroCustomEntity
@@ -48,6 +49,7 @@ import javax.inject.Inject
 class MapaViewModel @Inject constructor(
     private val repository: SheetsRepository,
     private val profileRepository: ProfileRepository,
+    private val clienteDao: ClienteDao,
     private val checkInDao: CheckInDao,
     private val rotaAtivaDao: RotaAtivaDao,
     private val checkInHistoryDao: CheckInHistoryDao,
@@ -91,6 +93,7 @@ class MapaViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val gruposDisponiveis: StateFlow<List<String>> = combine(repository.listarGrupos(), filtrosCustom) { daPlanilha, custom ->
+        // Mantém "Todos" sempre disponível para o filtro de visualização
         val todos = listOf("Todos") + daPlanilha + custom.map { it.nome }
         todos.distinct()
     }.stateIn(
@@ -110,7 +113,9 @@ class MapaViewModel @Inject constructor(
         val customFilter = customFilters.find { it.nome == grupo }
         
         lista.map { 
-            Route(it.id, it.nomeCliente, it.endereco, it.latitude, it.longitude, it.status, it.grupoFiltro) 
+            val custom = customFilters.find { cf -> cf.idsClientes.split(",").contains(it.id) }
+            val displayGroup = custom?.nome ?: it.grupoFiltro
+            Route(it.id, it.nomeCliente, it.endereco, it.latitude, it.longitude, it.status, displayGroup) 
         }.filter { route ->
             val matchesQuery = query.isBlank() || 
                     route.clientName.contains(query, ignoreCase = true) || 
@@ -173,6 +178,40 @@ class MapaViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Move um cliente de um grupo para outro (Custom ou Planilha).
+     */
+    fun alterarGrupoCliente(clienteId: String, novoGrupoNome: String) {
+        viewModelScope.launch {
+            // 1. Remover de filtros customizados onde o cliente possa estar
+            val todosCustom = filtrosCustom.value
+            todosCustom.forEach { filtro ->
+                val ids = filtro.idsClientes.split(",").toMutableList()
+                if (ids.contains(clienteId)) {
+                    ids.remove(clienteId)
+                    if (ids.isEmpty()) {
+                        filtroCustomDao.deletar(filtro.id)
+                    } else {
+                        filtroCustomDao.salvar(filtro.copy(idsClientes = ids.joinToString(",")))
+                    }
+                }
+            }
+
+            // 2. Verificar se o destino é um filtro customizado existente
+            val destinoCustom = todosCustom.find { it.nome == novoGrupoNome }
+            if (destinoCustom != null) {
+                val ids = destinoCustom.idsClientes.split(",").toMutableList()
+                if (!ids.contains(clienteId)) {
+                    ids.add(clienteId)
+                    filtroCustomDao.salvar(destinoCustom.copy(idsClientes = ids.joinToString(",")))
+                }
+            } else {
+                // 3. Destino é um grupo "físico" no ClienteEntity
+                clienteDao.atualizarGrupo(clienteId, novoGrupoNome)
+            }
+        }
+    }
+
     fun toggleCliente(id: String) {
         _selecionados.update { current ->
             if (current.contains(id)) current - id else current + id
@@ -198,6 +237,28 @@ class MapaViewModel @Inject constructor(
 
     fun recarregarPlanilha() {
         refreshRoutes()
+    }
+
+    fun excluirCliente(clienteId: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            rotaAtivaDao.removerCliente(clienteId)
+            repository.agendarExclusaoClientes(listOf(clienteId))
+            _isLoading.value = false
+        }
+    }
+
+    fun excluirSelecionados() {
+        val ids = _selecionados.value.toList()
+        if (ids.isEmpty()) return
+        
+        viewModelScope.launch {
+            _isLoading.value = true
+            ids.forEach { rotaAtivaDao.removerCliente(it) }
+            repository.agendarExclusaoClientes(ids)
+            limparSelecao()
+            _isLoading.value = false
+        }
     }
 
     /**
@@ -237,11 +298,16 @@ class MapaViewModel @Inject constructor(
                     endereco = endereco,
                     latitude = location.latitude,
                     longitude = location.longitude,
-                    grupoFiltro = grupo
+                    grupoFiltro = grupo,
+                    sincronizado = false
                 )
 
-                val result = repository.cadastrarNovoCliente(token, novoCliente)
-                onComplete(result)
+                val result = repository.agendarCadastroNovoCliente(novoCliente)
+                if (result.isSuccess) {
+                    onComplete(Result.success(Unit))
+                } else {
+                    onComplete(result)
+                }
             } catch (e: Exception) {
                 onComplete(Result.failure(e))
             } finally {
@@ -263,10 +329,12 @@ class MapaViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     
     // Converte os IDs da rota ativa em objetos Route completos buscando da lista mestre (clientes)
-    val clientesRotaAtiva: StateFlow<List<Route>> = combine(_listaIdsRotaAtiva, clientes) { ids, listaMestre ->
+    val clientesRotaAtiva: StateFlow<List<Route>> = combine(_listaIdsRotaAtiva, clientes, filtrosCustom) { ids, listaMestre, customFilters ->
         ids.mapNotNull { id ->
-            listaMestre.find { it.id == id }?.let {
-                Route(it.id, it.nomeCliente, it.endereco, it.latitude, it.longitude, it.status, it.grupoFiltro)
+            listaMestre.find { it.id == id }?.let { 
+                val custom = customFilters.find { cf -> cf.idsClientes.split(",").contains(it.id) }
+                val displayGroup = custom?.nome ?: it.grupoFiltro
+                Route(it.id, it.nomeCliente, it.endereco, it.latitude, it.longitude, it.status, displayGroup)
             }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -398,8 +466,11 @@ class MapaViewModel @Inject constructor(
     }
 
     fun getFilteredRoutes(): List<Route> {
+        val customFilters = filtrosCustom.value
         val todos = clientes.value.map { 
-            Route(it.id, it.nomeCliente, it.endereco, it.latitude, it.longitude, it.status, it.grupoFiltro) 
+            val custom = customFilters.find { cf -> cf.idsClientes.split(",").contains(it.id) }
+            val displayGroup = custom?.nome ?: it.grupoFiltro
+            Route(it.id, it.nomeCliente, it.endereco, it.latitude, it.longitude, it.status, displayGroup) 
         }
         return todos.filter { _selecionados.value.contains(it.id) }
     }

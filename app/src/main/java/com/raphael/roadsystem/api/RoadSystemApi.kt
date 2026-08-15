@@ -31,8 +31,7 @@ data class AddClientRequest(
     val clientName: String,
     val address: String,
     val latitude: Double,
-    val longitude: Double,
-    val grupoFiltro: String
+    val longitude: Double
 )
 
 data class AddClientResponse(

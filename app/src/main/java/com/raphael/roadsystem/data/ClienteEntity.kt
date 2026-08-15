@@ -16,5 +16,6 @@ data class ClienteEntity(
     val longitude: Double,
     val ordemVisita: Int = 0,
     val status: String = "PENDENTE",
-    val grupoFiltro: String = "Sem Categoria"
+    val grupoFiltro: String = "Sem Categoria",
+    val sincronizado: Boolean = false
 )

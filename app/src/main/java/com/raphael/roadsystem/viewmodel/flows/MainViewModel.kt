@@ -35,6 +35,8 @@ class MainViewModel @Inject constructor(
     private val _checkInStatus = MutableStateFlow<String?>(null)
     val checkInStatus = _checkInStatus.asStateFlow()
 
+    val appVersion = com.raphael.roadsystem.BuildConfig.VERSION_NAME
+
     @SuppressLint("MissingPermission")
     fun startLocationUpdates() {
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000)
