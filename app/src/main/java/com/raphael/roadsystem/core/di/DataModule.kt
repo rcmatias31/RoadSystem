@@ -12,6 +12,7 @@ import com.raphael.roadsystem.data.AuthRepository
 import com.raphael.roadsystem.data.CheckInDao
 import com.raphael.roadsystem.data.ProfileDao
 import com.raphael.roadsystem.data.ClienteDao
+import com.raphael.roadsystem.data.CheckInHistoryDao
 import com.raphael.roadsystem.data.RotaAtivaDao
 import com.raphael.roadsystem.data.SheetsRepository
 import dagger.Module
@@ -52,6 +53,9 @@ object DataModule {
 
     @Provides
     fun provideRotaAtivaDao(database: AppDatabase): RotaAtivaDao = database.rotaAtivaDao()
+
+    @Provides
+    fun provideCheckInHistoryDao(database: AppDatabase): CheckInHistoryDao = database.checkInHistoryDao()
 
     @Provides
     @Singleton

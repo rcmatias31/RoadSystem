@@ -15,6 +15,8 @@ import com.google.android.gms.tasks.CancellationTokenSource
 import com.raphael.roadsystem.BuildConfig
 import com.raphael.roadsystem.api.RetrofitClient
 import com.raphael.roadsystem.data.CheckInDao
+import com.raphael.roadsystem.data.CheckInHistoryDao
+import com.raphael.roadsystem.data.CheckInHistoryEntity
 import com.raphael.roadsystem.data.CheckInPendenteEntity
 import com.raphael.roadsystem.data.ProfileRepository
 import com.raphael.roadsystem.data.ClienteEntity
@@ -32,6 +34,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -45,6 +48,7 @@ class MapaViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
     private val checkInDao: CheckInDao,
     private val rotaAtivaDao: RotaAtivaDao,
+    private val checkInHistoryDao: CheckInHistoryDao,
     private val workManager: WorkManager
 ) : ViewModel() {
 
@@ -56,7 +60,23 @@ class MapaViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
-    // 2. Filtros e Estados de Seleção
+    // 2. Estatísticas do Dashboard e Filtro de Histórico
+    private val _dataSelecionadaIso = MutableStateFlow(
+        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+    )
+    val dataSelecionadaIso: StateFlow<String> = _dataSelecionadaIso.asStateFlow()
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val totalAtendidosHoje: StateFlow<Int> = _dataSelecionadaIso.flatMapLatest { data ->
+        checkInHistoryDao.countAtendimentosPorData(data)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val historicoFiltrado: StateFlow<List<CheckInHistoryEntity>> = _dataSelecionadaIso.flatMapLatest { data ->
+        checkInHistoryDao.getHistoricoPorData(data)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // 3. Filtros e Estados de Seleção
     private val _filtroGrupo = MutableStateFlow("Todos")
     val filtroGrupo: StateFlow<String> = _filtroGrupo.asStateFlow()
 
@@ -156,16 +176,54 @@ class MapaViewModel @Inject constructor(
     private val _navigationDetails = MutableStateFlow<String>("Selecione os clientes e inicie a rota")
     val navigationDetails: StateFlow<String> = _navigationDetails.asStateFlow()
 
-    fun registrarCheckIn(routeId: String, tipo: String) {
-        val dataHora = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+    fun registrarCheckIn(routeId: String, tipo: String, latLng: LatLng? = null) {
+        val now = java.util.Calendar.getInstance().time
+        val dataHora = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.getDefault()).format(now)
+        val dataIso = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(now)
         
         viewModelScope.launch {
+            // Busca o cliente para salvar no histórico antes de remover da rota
+            val cliente = clientes.value.find { it.id == routeId }
+            cliente?.let {
+                checkInHistoryDao.inserir(
+                    CheckInHistoryEntity(
+                        clienteId = it.id,
+                        nomeCliente = it.nomeCliente,
+                        dataHora = dataHora,
+                        dataIso = dataIso,
+                        tipo = tipo,
+                        latitude = latLng?.latitude,
+                        longitude = latLng?.longitude
+                    )
+                )
+            }
+
             // Remove do banco de dados (a lista reativa _listaIdsRotaAtiva se atualizará sozinha)
             rotaAtivaDao.removerCliente(routeId)
             
-            checkInDao.inserirCheckIn(CheckInPendenteEntity(clienteId = routeId, dataHora = dataHora, tipo = tipo))
-            val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
-            val syncRequest = OneTimeWorkRequestBuilder<SyncCheckInWorker>().setConstraints(constraints).build()
+            checkInDao.inserirCheckIn(
+                CheckInPendenteEntity(
+                    clienteId = routeId, 
+                    dataHora = dataHora, 
+                    tipo = tipo,
+                    auditLat = latLng?.latitude,
+                    auditLng = latLng?.longitude
+                )
+            )
+            
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
+
+            val syncRequest = OneTimeWorkRequestBuilder<SyncCheckInWorker>()
+                .setConstraints(constraints)
+                .setBackoffCriteria(
+                    androidx.work.BackoffPolicy.EXPONENTIAL,
+                    androidx.work.WorkRequest.MIN_BACKOFF_MILLIS,
+                    java.util.concurrent.TimeUnit.MILLISECONDS
+                )
+                .build()
+                
             workManager.enqueue(syncRequest)
         }
     }
@@ -199,6 +257,14 @@ class MapaViewModel @Inject constructor(
         viewModelScope.launch {
             profileRepository.getUserProfile().collect { _userProfile.value = it }
         }
+        
+        // Limpeza automática de histórico com mais de 30 dias
+        viewModelScope.launch {
+            val calendar = java.util.Calendar.getInstance()
+            calendar.add(java.util.Calendar.DAY_OF_YEAR, -30)
+            val dataLimite = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(calendar.time)
+            checkInHistoryDao.limparHistoricoAntigo(dataLimite)
+        }
     }
 
     /**
@@ -216,6 +282,10 @@ class MapaViewModel @Inject constructor(
     fun testFetchRealRoutes(idToken: String) {
         lastIdToken = idToken
         refreshRoutes()
+    }
+
+    fun selecionarData(data: java.util.Date) {
+        _dataSelecionadaIso.value = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(data)
     }
 
     fun onSearchQueryChange(newQuery: String) {
@@ -316,6 +386,39 @@ class MapaViewModel @Inject constructor(
                 _navInfo.value = NavigationInfo(isActive = false)
             }
             finally { _isLoading.value = false }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    fun navigateToBase(fusedLocationClient: FusedLocationProviderClient, context: android.content.Context) {
+        val profile = _userProfile.value
+        if (profile == null || profile.address.isEmpty()) {
+            android.widget.Toast.makeText(context, "Endereço da base não configurado!", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                _isLoading.value = true
+                val location = fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, CancellationTokenSource().token).await()
+                val origin = if (location != null) "${location.latitude},${location.longitude}" else ""
+                val destination = "${profile.latitude},${profile.longitude}"
+
+                // Abre o Google Maps para navegação direta à base
+                val uri = android.net.Uri.parse("google.navigation:q=$destination")
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
+                intent.setPackage("com.google.android.apps.maps")
+                context.startActivity(intent)
+                
+                // Finaliza a rota ativa no app (Mas mantém o histórico para consulta)
+                stopNavigation()
+                
+                android.widget.Toast.makeText(context, "Navegando para a Base...", android.widget.Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Log.e("MapaViewModel", "Erro ao navegar para base: ${e.message}")
+            } finally {
+                _isLoading.value = false
+            }
         }
     }
 }

@@ -23,7 +23,9 @@ interface RoadSystemApi {
 data class CheckInRequest(
     val routeId: String,
     val timestamp: String,
-    val type: String // "PRESENCIAL" ou "REMOTO"
+    val type: String, // "PRESENCIAL" ou "REMOTO"
+    val lat: Double? = null,
+    val lng: Double? = null
 )
 
 data class CheckInResponse(

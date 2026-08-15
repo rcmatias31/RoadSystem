@@ -5,13 +5,14 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [ClienteEntity::class, UserProfileEntity::class, CheckInPendenteEntity::class, RotaAtivaEntity::class], version = 5, exportSchema = false)
+@Database(entities = [ClienteEntity::class, UserProfileEntity::class, CheckInPendenteEntity::class, RotaAtivaEntity::class, CheckInHistoryEntity::class], version = 8, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun clienteDao(): ClienteDao
     abstract fun profileDao(): ProfileDao
     abstract fun checkInDao(): CheckInDao
     abstract fun rotaAtivaDao(): RotaAtivaDao
+    abstract fun checkInHistoryDao(): CheckInHistoryDao
 
     companion object {
         @Volatile

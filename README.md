@@ -29,5 +29,10 @@ Construído com **Clean Architecture** e **MVVM**.
 - **Resiliência Geográfica (GeoUtils):** Desenvolvido algoritmo de parsing robusto para tratar coordenadas em formatos inconsistentes (notação científica como `E7` ou falta de ponto decimal/microdegrees). O sistema valida e corrige a escala para a região geográfica do Brasil automaticamente.
 - **Persistência de Estado (Rota Blindada):** A rota ativa agora é persistida no banco de dados local (`rota_ativa`). Isso impede a perda de dados caso o sistema encerre o app enquanto o motorista utiliza o Google Maps para navegação.
 - **Lookup Reativo por ID:** Refatoração da arquitetura para utilizar o **ID do cliente** como chave mestre. Mapa e Cards buscam informações em tempo real do banco de dados, garantindo integridade de nomes e endereços.
-- **Sincronização Inteligente:** Ajustada a lógica de sync para não limpar o cache local se houver uma jornada em andamento, permitindo atualizações de dados sem interromper a navegação ativa.
+- **Sincronização Inteligente (Fase 4):** Ajustada a lógica de sync para não limpar o cache local se houver uma jornada em andamento. Implementado **WorkManager com Backoff Exponencial** e auditoria de GPS (latitude/longitude gravadas no momento do clique no botão).
+- **Dashboard e Histórico (Fase 5):** 
+    - **Histórico Persistente de 30 dias:** Atendimentos salvos localmente com autolimpeza programada.
+    - **Consulta por Calendário:** Interface com `DatePicker` para visualização de entregas em datas anteriores.
+    - **Painel de Conclusão:** Resumo automático de atendimentos ao final da rota.
+    - **Retorno Inteligente à Base:** Botão que calcula e inicia a navegação GPS para o endereço residencial do motorista.
 - **Segurança e Build:** Configuração de build variants (Release/Debug) e tratamento automático de caracteres de escape em caminhos de arquivo no `local.properties`.

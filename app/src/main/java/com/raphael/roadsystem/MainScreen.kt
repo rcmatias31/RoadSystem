@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
@@ -111,6 +113,19 @@ fun MainScreen(
                     icon = { Icon(Icons.Default.Person, null) },
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
+                NavigationDrawerItem(
+                    label = { Text("Histórico") },
+                    selected = currentRoute == Screen.Historico.route,
+                    onClick = { 
+                        scope.launch { drawerState.close() }
+                        navController.navigate(Screen.Historico.route) {
+                            popUpTo(Screen.Mapa.route)
+                            launchSingleTop = true
+                        }
+                    },
+                    icon = { Icon(Icons.Default.History, null) },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
             }
         }
     ) {
@@ -122,6 +137,7 @@ fun MainScreen(
                             Screen.Mapa.route -> "Mapa Geral"
                             Screen.Selecao.route -> "Rota do Dia"
                             Screen.Perfil.route -> "Meu Perfil"
+                            Screen.Historico.route -> "Histórico"
                             else -> "RoadSystem"
                         }
                         Text(title) 
@@ -174,6 +190,9 @@ fun MainScreen(
                             navController.popBackStack()
                         })
                     }
+                    composable(Screen.Historico.route) {
+                        TelaHistorico(mapaViewModel)
+                    }
                 }
             }
         }
@@ -188,8 +207,11 @@ fun MapScreen(mainViewModel: MainViewModel, mapaViewModel: MapaViewModel) {
     val navInfo by mapaViewModel.navInfo.collectAsStateWithLifecycle()
     val clienteAtual by mapaViewModel.clienteAtual.collectAsStateWithLifecycle()
     val clientesRotaAtiva by mapaViewModel.clientesRotaAtiva.collectAsStateWithLifecycle()
+    val totalAtendidos by mapaViewModel.totalAtendidosHoje.collectAsStateWithLifecycle()
     val isLoading by mapaViewModel.isLoading.collectAsStateWithLifecycle()
     val cameraPositionState = rememberCameraPositionState()
+    
+    val fusedLocationClient = remember { com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context) }
 
     LaunchedEffect(userLocation) {
         userLocation?.let {
@@ -249,6 +271,7 @@ fun MapScreen(mainViewModel: MainViewModel, mapaViewModel: MapaViewModel) {
                 PainelControleViagem(
                     cliente = clienteAtual,
                     userLocation = userLocation,
+                    totalConcluido = totalAtendidos,
                     onNavegar = {
                         clienteAtual?.let {
                             val uri = Uri.parse("google.navigation:q=${it.latitude},${it.longitude}")
@@ -258,20 +281,12 @@ fun MapScreen(mainViewModel: MainViewModel, mapaViewModel: MapaViewModel) {
                     },
                     onCheckIn = { tipo ->
                         clienteAtual?.let {
-                            mapaViewModel.registrarCheckIn(it.id, tipo)
+                            mapaViewModel.registrarCheckIn(it.id, tipo, userLocation)
                             Toast.makeText(context, "Check-in $tipo realizado!", Toast.LENGTH_SHORT).show()
                         }
                     },
                     onFinalizar = {
-                        // Lógica de Retorno à Base (Passo 5/7/8)
-                        val profile = mapaViewModel.userProfile.value
-                        if (profile != null) {
-                            val uri = Uri.parse("google.navigation:q=${profile.latitude},${profile.longitude}")
-                            val intent = Intent(Intent.ACTION_VIEW, uri)
-                            context.startActivity(intent)
-                            Toast.makeText(context, "Navegando para a Base...", Toast.LENGTH_LONG).show()
-                        }
-                        mapaViewModel.stopNavigation()
+                        mapaViewModel.navigateToBase(fusedLocationClient, context)
                     }
                 )
             }
@@ -283,6 +298,7 @@ fun MapScreen(mainViewModel: MainViewModel, mapaViewModel: MapaViewModel) {
 fun PainelControleViagem(
     cliente: Route?,
     userLocation: LatLng?,
+    totalConcluido: Int,
     onNavegar: () -> Unit,
     onCheckIn: (String) -> Unit,
     onFinalizar: () -> Unit
@@ -390,14 +406,22 @@ fun PainelControleViagem(
                     }
                 } else {
                     Text(
-                        text = "Todas as entregas concluídas",
+                        text = "Jornada Concluída!",
                         style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 16.dp)
+                        color = Color(0xFF4CAF50)
                     )
+                    Text(
+                        text = "Total de atendimentos hoje: $totalConcluido",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = onFinalizar,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
                     ) {
+                        Icon(Icons.Default.Home, null)
+                        Spacer(Modifier.width(8.dp))
                         Text("Retornar para a Base")
                     }
                 }

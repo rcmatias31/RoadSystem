@@ -42,7 +42,9 @@ class SyncCheckInWorker @AssistedInject constructor(
                     request = CheckInRequest(
                         routeId = checkIn.clienteId,
                         timestamp = checkIn.dataHora,
-                        type = checkIn.tipo
+                        type = checkIn.tipo,
+                        lat = checkIn.auditLat,
+                        lng = checkIn.auditLng
                     )
                 )
 
