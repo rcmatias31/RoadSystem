@@ -11,7 +11,7 @@ interface RoadSystemApi {
     @GET("get-routes-api")
     suspend fun getRoutes(
         @Header("Authorization") token: String
-    ): List<Route>
+    ): List<RouteDto>
 
     @POST("register-checkin-api")
     suspend fun registerCheckIn(

@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -5,6 +8,14 @@ plugins {
     alias(libs.plugins.mapsplatform.secrets)
     alias(libs.plugins.google.services)
     alias(libs.plugins.hilt)
+}
+
+// Security Configuration: Load secrets from local.properties
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { load(it) }
+    }
 }
 
 android {
@@ -19,23 +30,53 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Inject Secrets into Manifest and BuildConfig
+        val mapsApiKey = localProperties.getProperty("MAPS_API_KEY") ?: ""
+        val clienteId = localProperties.getProperty("ClienteID") ?: ""
+        val certSha1 = localProperties.getProperty("CERT_SHA1") ?: ""
+        
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+        buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
+        buildConfigField("String", "ClienteID", "\"$clienteId\"")
+        buildConfigField("String", "CERT_SHA1", "\"$certSha1\"")
+    }
+
+    signingConfigs {
+        create("release") {
+            val storePath = localProperties.getProperty("RELEASE_STORE_FILE") ?: ""
+            storeFile = if (storePath.isNotEmpty()) file(storePath) else null
+            storePassword = localProperties.getProperty("RELEASE_STORE_PASSWORD") ?: ""
+            keyAlias = localProperties.getProperty("RELEASE_KEY_ALIAS") ?: ""
+            keyPassword = localProperties.getProperty("RELEASE_KEY_PASSWORD") ?: ""
+        }
     }
 
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             optimization {
                 enable = false
             }
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     buildFeatures {
         compose = true
         buildConfig = true
     }
+}
+
+secrets {
+    // Ignore all keys starting with RELEASE_ as they are sensitive and only used for signing
+    ignoreList.add("RELEASE_.*")
 }
 
 dependencies {

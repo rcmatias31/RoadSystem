@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "877390819131-vsgjph0c035fsl7521eflgf4060gtc1n.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.raphael.roadsystem",
+            "certificate_hash": "6dfc504fcc8a11fe8b4bb40cd1e38d704410a1df"
+          }
+        },
+        {
           "client_id": "877390819131-5gjgt0s2klfdp1f8th5gpn2t5gco4ops.apps.googleusercontent.com",
           "client_type": 3
         }

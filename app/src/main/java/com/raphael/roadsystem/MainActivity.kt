@@ -21,7 +21,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.raphael.roadsystem.data.AppDatabase
 import com.raphael.roadsystem.data.AuthRepository
-import com.raphael.roadsystem.data.RotaRepository
+import com.raphael.roadsystem.data.SheetsRepository
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.raphael.roadsystem.ui.theme.RoadSystemTheme

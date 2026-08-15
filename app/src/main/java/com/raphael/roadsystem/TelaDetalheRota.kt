@@ -25,7 +25,7 @@ fun TelaDetalheRota(
     navController: NavController,
     onBack: () -> Unit
 ) {
-    val apiRotas by viewModel.apiRotas.collectAsState()
+    val apiRotas by viewModel.clientesFiltrados.collectAsState()
     val route = apiRotas.find { it.id == routeId }
     
     // Estados do Checklist

@@ -20,5 +20,14 @@ Construído com **Clean Architecture** e **MVVM**.
 * **Rede:** Retrofit + OkHttp
 
 ## 📡 Engenharia Offline-First
-* **Optimistic UI:** Interface atualizada instantaneamente.
-* **Store and Forward:** Dados gravados localmente (Room) e sincronizados em background (WorkManager) quando a conexão 4G/Wi-Fi é restabelecida, renovando automaticamente o token JWT.
+* **Optimistic UI:** Interface updated instantly.
+* **Store and Forward:** Data recorded locally (Room) and synchronized in the background (WorkManager) when connection is restored.
+
+## ✅ Últimas Implementações (Fase 1 e Refinamentos)
+
+- **Mapeamento Dinâmico (Google Sheets API):** Implementada a leitura do range `A2:G`, com suporte automático a categorias (Coluna G). O app agora gera **FilterChips dinâmicos** baseados no conteúdo da planilha.
+- **Resiliência Geográfica (GeoUtils):** Desenvolvido algoritmo de parsing robusto para tratar coordenadas em formatos inconsistentes (notação científica como `E7` ou falta de ponto decimal/microdegrees). O sistema valida e corrige a escala para a região geográfica do Brasil automaticamente.
+- **Persistência de Estado (Rota Blindada):** A rota ativa agora é persistida no banco de dados local (`rota_ativa`). Isso impede a perda de dados caso o sistema encerre o app enquanto o motorista utiliza o Google Maps para navegação.
+- **Lookup Reativo por ID:** Refatoração da arquitetura para utilizar o **ID do cliente** como chave mestre. Mapa e Cards buscam informações em tempo real do banco de dados, garantindo integridade de nomes e endereços.
+- **Sincronização Inteligente:** Ajustada a lógica de sync para não limpar o cache local se houver uma jornada em andamento, permitindo atualizações de dados sem interromper a navegação ativa.
+- **Segurança e Build:** Configuração de build variants (Release/Debug) e tratamento automático de caracteres de escape em caminhos de arquivo no `local.properties`.

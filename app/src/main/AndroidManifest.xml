@@ -21,10 +21,10 @@
             android:name="org.apache.http.legacy"
             android:required="false" />
 
-        <!-- TODO: Não esqueça de colocar sua API Key do Google Cloud aqui! Sem ela o app vai "crashar" quando o mapa carregar -->
+        <!-- API Key injetada via local.properties através do manifestPlaceholders no build.gradle.kts -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyAe8NHdxvvsghZvptqElSpBI8YRIc4_TW4" />
+            android:value="${MAPS_API_KEY}" />
 
         <activity
             android:name=".MainActivity"
@@ -53,6 +53,12 @@
             <!-- Bloqueia o inicializador do KTX -->
             <meta-data
                 android:name="com.google.maps.android.ktx.utils.attribution.AttributionIdInitializer"
+                tools:node="remove" />
+
+            <!-- Bloqueia o inicializador automático do WorkManager (uso de On-Demand Initialization) -->
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
                 tools:node="remove" />
 
         </provider>

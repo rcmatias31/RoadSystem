@@ -1,5 +1,6 @@
 package com.raphael.roadsystem.api
 
+import com.raphael.roadsystem.BuildConfig
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -33,8 +34,8 @@ object RetrofitClient {
         val identityInterceptor = okhttp3.Interceptor { chain ->
             val request = chain.request().newBuilder()
                 .addHeader("X-Android-Package", "com.raphael.roadsystem")
-                // O SHA-1 abaixo deve ser o mesmo cadastrado no seu Console do Google Cloud
-                .addHeader("X-Android-Cert", "C5A290B5EDFCE03FF32DE0E7FAD8014B8D68349C") 
+                // O SHA-1 injetado via BuildConfig a partir do local.properties
+                .addHeader("X-Android-Cert", BuildConfig.CERT_SHA1) 
                 .build()
             chain.proceed(request)
         }

@@ -1,23 +1,15 @@
 package com.raphael.roadsystem.model
 
-import com.google.gson.annotations.SerializedName
-
+/**
+ * Modelo de domínio para rotas e clientes usado na UI.
+ * As coordenadas são garantidas como Double.
+ */
 data class Route(
-    @SerializedName("id")
     val id: String,
-    
-    @SerializedName("clientName")
     val clientName: String,
-    
-    @SerializedName("address")
     val address: String,
-    
-    @SerializedName("latitude")
     val latitude: Double,
-    
-    @SerializedName("longitude")
     val longitude: Double,
-    
-    @SerializedName("status")
-    val status: String
+    val status: String,
+    val grupoFiltro: String? = null
 )

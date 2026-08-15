@@ -187,6 +187,8 @@ fun MapScreen(mainViewModel: MainViewModel, mapaViewModel: MapaViewModel) {
     val polylinePoints by mapaViewModel.roadPolylinePoints.collectAsStateWithLifecycle()
     val navInfo by mapaViewModel.navInfo.collectAsStateWithLifecycle()
     val clienteAtual by mapaViewModel.clienteAtual.collectAsStateWithLifecycle()
+    val clientesRotaAtiva by mapaViewModel.clientesRotaAtiva.collectAsStateWithLifecycle()
+    val isLoading by mapaViewModel.isLoading.collectAsStateWithLifecycle()
     val cameraPositionState = rememberCameraPositionState()
 
     LaunchedEffect(userLocation) {
@@ -211,24 +213,29 @@ fun MapScreen(mainViewModel: MainViewModel, mapaViewModel: MapaViewModel) {
                     zoomControlsEnabled = true
                 )
             ) {
-                if (polylinePoints.isNotEmpty()) {
-                    Polyline(
-                        points = polylinePoints,
-                        color = Color.Blue,
-                        width = 12f
-                    )
-                    
-                    mapaViewModel.getFilteredRoutes().forEach { route ->
-                        Marker(
-                            state = rememberMarkerState(position = LatLng(route.latitude, route.longitude)),
-                            title = route.clientName
+                if (polylinePoints.isNotEmpty() || clientesRotaAtiva.isNotEmpty()) {
+                    if (polylinePoints.isNotEmpty()) {
+                        Polyline(
+                            points = polylinePoints,
+                            color = Color.Blue,
+                            width = 12f
                         )
+                    }
+                    
+                    clientesRotaAtiva.forEach { route ->
+                        key(route.id) {
+                            Marker(
+                                state = rememberMarkerState(position = LatLng(route.latitude, route.longitude)),
+                                title = route.clientName,
+                                snippet = route.address
+                            )
+                        }
                     }
                 }
             }
         }
 
-        if (userLocation == null && mainViewModel.hasLocationPermission) {
+        if ((userLocation == null && mainViewModel.hasLocationPermission) || isLoading) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         }
 

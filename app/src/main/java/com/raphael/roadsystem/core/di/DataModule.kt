@@ -11,8 +11,9 @@ import com.raphael.roadsystem.data.AppDatabase
 import com.raphael.roadsystem.data.AuthRepository
 import com.raphael.roadsystem.data.CheckInDao
 import com.raphael.roadsystem.data.ProfileDao
-import com.raphael.roadsystem.data.RotaDao
-import com.raphael.roadsystem.data.RotaRepository
+import com.raphael.roadsystem.data.ClienteDao
+import com.raphael.roadsystem.data.RotaAtivaDao
+import com.raphael.roadsystem.data.SheetsRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -41,13 +42,16 @@ object DataModule {
     }
 
     @Provides
-    fun provideRotaDao(database: AppDatabase): RotaDao = database.rotaDao()
+    fun provideClienteDao(database: AppDatabase): ClienteDao = database.clienteDao()
 
     @Provides
     fun provideProfileDao(database: AppDatabase): ProfileDao = database.profileDao()
 
     @Provides
     fun provideCheckInDao(database: AppDatabase): CheckInDao = database.checkInDao()
+
+    @Provides
+    fun provideRotaAtivaDao(database: AppDatabase): RotaAtivaDao = database.rotaAtivaDao()
 
     @Provides
     @Singleton
@@ -67,7 +71,7 @@ object DataModule {
 
     @Provides
     @Singleton
-    fun provideRotaRepository(rotaDao: RotaDao): RotaRepository {
-        return RotaRepository(rotaDao)
+    fun provideSheetsRepository(clienteDao: ClienteDao, api: RoadSystemApi): SheetsRepository {
+        return SheetsRepository(clienteDao, api)
     }
 }
